@@ -69,9 +69,13 @@ class Camera(interface.Camera):
 			self.properties.append(cls(self))
 		
 	
-	def supportsViewfinder(self):
+	def hasViewfinder(self):
 		return False
 
+	
+	def hasCapture(self):
+		return False
+	
 	
 	def getProperties(self):
 		return self.properties

@@ -75,6 +75,10 @@ class Camera(interface.Camera):
 		)
 		
 	
+	def hasCapture(self):
+		return True
+	
+	
 	def hasViewfinder(self):
 		return True
 	

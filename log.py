@@ -7,10 +7,10 @@ import traceback
 import logging
 import logging.handlers
 from logging import CRITICAL,ERROR,WARNING,INFO,DEBUG
+import os
+from base import smDataPath
 
 __all__ = ['configureLogging','log','logException','debug','info','warning','warn','error','critical','exception','CRITICAL','ERROR','WARNING','INFO','DEBUG']
-
-import config
 
 #
 # Setup Python logging based on configuration options
@@ -24,26 +24,28 @@ def configureLogging():
 	"""
 	global logger
 	
+	if 'logger' in globals():
+		raise Exception('Logging has already been configured')
+	
 	logger = logging.getLogger('scanmanager')
 	
 	handler = logging.handlers.RotatingFileHandler(
-		filename=config.cfg.logging.logFile,
+		filename=os.path.join(smDataPath(),'scanmanager.log'),
 		mode='a',
 		maxBytes=(1024)*1024,
 		backupCount=10,
 	)
-	handler.setLevel(config.cfg.logging.fileLogLevel)
+	handler.setLevel(DEBUG)
 	formatter = logging.Formatter('%(asctime)s %(levelname)-8s [scanmanager] %(message)s')
 	handler.setFormatter(formatter)
 	logger.addHandler(handler)
 	logger.setLevel(logging.NOTSET)
 	
-	if config.cfg.logging.logToScreen:
-		console = logging.StreamHandler()
-		console.setLevel(config.cfg.logging.screenLogLevel)
-		formatter = logging.Formatter('%(asctime)s %(levelname)-8s [scanmanager] %(message)s')
-		console.setFormatter(formatter)
-		logger.addHandler(console)
+	console = logging.StreamHandler()
+	console.setLevel(WARNING)
+	formatter = logging.Formatter('%(asctime)s %(levelname)-8s [scanmanager] %(message)s')
+	console.setFormatter(formatter)
+	logger.addHandler(console)
 
 	logger.setLevel(-1)
 

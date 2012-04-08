@@ -112,9 +112,13 @@ class Camera(interface.Camera):
 		self.opened = True
 
 	
-	def supportsViewfinder(self):
+	def hasViewfinder(self):
 		return False
 
+
+	def hasCapture(self):
+		return self.mode == WIAAPIMode.Tethered
+	
 	
 	def capture(self):
 		self.dev.ExecuteCommand(wia.wiaCommandTakePicture)

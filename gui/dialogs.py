@@ -78,9 +78,10 @@ class CrashDialog(BaseDialog,QtGui.QDialog):
 	A dialogue window for reporting unhandled exceptions to the user 
 	"""
 	
-	def __init__(self,parent,text=None,html=None,canContinue=False):
+	def __init__(self,parent,text=None,html=None,canContinue=False,title=None):
 		self.text = text
 		self.html = html
+		self.title = title or self.tr('Error')
 		self.canContinue = canContinue
 		self.clickedExit = False
 		self.clickedContinue = False
@@ -88,9 +89,9 @@ class CrashDialog(BaseDialog,QtGui.QDialog):
 	
 	def init(self):
 		self.setModal(True)
-		self.setWindowTitle(self.tr('Error'))
+		self.setWindowTitle(self.title)
 		if self.html:
-			self.Text.setHTML(self.html)
+			self.Text.setHtml(self.html)
 		elif self.text:
 			self.Text.setPlainText(self.text)
 		if not self.canContinue:

@@ -24,10 +24,10 @@ if platform.system().lower() == 'windows':
 						includes = ['PySide.QtNetwork','dumbdbm','dbhash'],
 			),
 		),
-		console = ('scanmanager.py',),
-		#windows = [
-		#	dict(
-		#		script = 'scanmanager.py',
-		#	)
-		#],	
+		#console = ('scanmanager.py',),
+		windows = [
+	       dict(
+				script = 'scanmanager.py',
+			)
+		],	
 	)

@@ -65,6 +65,7 @@ class DirectoryField(BaseWidget,QtGui.QWidget):
 			self.setContentsMargins(0,0,0,0)
 			self.addWidget(self._up.Field)
 			self.addWidget(self._up.Button)
+		
 
 	
 	class Field(BaseWidget,QtGui.QLineEdit):
@@ -132,7 +133,7 @@ class SizeField(BaseWidget,QtGui.QWidget):
 
 	def smSetValue(self,v):
 		self.Width.setText(str(v[0]))
-		self.Height.setText(str(v[0]))
+		self.Height.setText(str(v[1]))
 
 
 
@@ -210,7 +211,7 @@ class SetupWindow(BaseWidget,QtGui.QWidget):
 	def init(self):
 		self.Mode.setCurrentIndex(0)
 		self.Mode.oncurrentIndexChanged(0)
-		self.setWindowTitle(self.tr('scanmanager - settings'))
+		self.setWindowTitle(self.tr('ScanManager - settings'))
 		self.show()
 	
 						
@@ -276,7 +277,7 @@ class SetupWindow(BaseWidget,QtGui.QWidget):
 	class ThumbnailSize(SizeField):
 		def init(self):
 			self._up.Layout.addRow(self.tr('Thumbnail size:'),self)
-			self.smSetValue((200,300))
+			self.smSetValue((130,130))
 
 
 	class Buttons(BaseWidget,QtGui.QFrame):

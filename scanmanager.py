@@ -5,6 +5,10 @@ import traceback
 from gui.dialogs import CrashDialog
 
 import backend
+from log import *
+
+import resources
+
 
 def excepthook(excType, excValue, tracebackobj):
 	"""
@@ -12,11 +16,9 @@ def excepthook(excType, excValue, tracebackobj):
 	"""
 	global app
 	excInfo = (excType, excValue, tracebackobj)
-	lines = traceback.format_exception(*excInfo)
-	tb = ''.join(lines)
-	sys.stderr.write(tb)
+	text = logException(excInfo=excInfo)
 	try:
-		dialog = CrashDialog(parent=app.activeWindow(),text=tb)
+		dialog = CrashDialog(parent=app.activeWindow(),html='<pre>%s</pre>'%text)
 		dialog.open()
 	except:
 		pass
@@ -24,6 +26,7 @@ def excepthook(excType, excValue, tracebackobj):
 
 if __name__ == '__main__':
 	
+	configureLogging()
 	app = App(sys.argv)
 	sys.excepthook = excepthook
 	app.exec_()

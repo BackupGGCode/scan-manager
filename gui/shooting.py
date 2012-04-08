@@ -82,7 +82,7 @@ class MainWindow(BaseWidget,QtGui.QMainWindow):
 	def init(self):
 		self.setCentralWidget(self.ShootingView)
 		self.resize(900,600)
-		self.setWindowTitle(self.tr('scanmanager'))
+		self.setWindowTitle(self.tr('ScanManager - shooting'))
 		self.setCorner(Qt.TopRightCorner,Qt.RightDockWidgetArea)
 		self.setCorner(Qt.BottomRightCorner,Qt.RightDockWidgetArea)
 		
@@ -110,7 +110,7 @@ class MainWindow(BaseWidget,QtGui.QMainWindow):
 		
 		# the the image manager with any pre-existing images in the target directory 
 		progress.open()
-		self.app.imageManager.fillFromDirectory(progressCallback=lambda total,done: progress.setValue(int((done/total)*100)))
+		self.app.imageManager.fillFromDirectory(progressCallback=lambda total,done: progress.setValue(int((float(done)/float(total))*100.0)))
 		progress.close()
 		
 		# for solo mode
@@ -121,6 +121,10 @@ class MainWindow(BaseWidget,QtGui.QMainWindow):
 		for ndx,camera in enumerate(self.app.cameras):
 			cc = getattr(self.app,'Camera%dControls'%(ndx+1))
 			cc.setup(camera)
+
+		# hide the capture button if neither camera supports it			
+		if not (self.app.cameras[0].hasCapture() or self.app.cameras[0].hasCapture()):
+			self.app.CaptureButton.hide()
 				
 		
 	class ShootingView(BaseWidget,QtGui.QWidget):
@@ -148,6 +152,7 @@ class MainWindow(BaseWidget,QtGui.QMainWindow):
 			self.setWindowTitle(self.tr('Camera 1 controls'))
 			self._up.addDockWidget(Qt.BottomDockWidgetArea,self)
 			self.setWidget(self.CameraControls)
+			self.setFeatures(QtGui.QDockWidget.DockWidgetFloatable|QtGui.QDockWidget.DockWidgetMovable)
 
 		class CameraControls(BaseWidget,QtGui.QSplitter):
 			
@@ -176,6 +181,7 @@ class MainWindow(BaseWidget,QtGui.QMainWindow):
 			self.setWindowTitle(self.tr('Camera 2 controls'))
 			self._up.addDockWidget(Qt.BottomDockWidgetArea,self)
 			self.setWidget(self.CameraControls)
+			self.setFeatures(QtGui.QDockWidget.DockWidgetFloatable|QtGui.QDockWidget.DockWidgetMovable)
 
 		class CameraControls(BaseWidget,QtGui.QSplitter):
 			
@@ -202,17 +208,41 @@ class MainWindow(BaseWidget,QtGui.QMainWindow):
 			self.setWindowTitle(self.tr('Common controls'))
 			self._up.addDockWidget(Qt.RightDockWidgetArea,self)
 			self.setWidget(self.CommonControls)
+			self.setFeatures(QtGui.QDockWidget.DockWidgetFloatable|QtGui.QDockWidget.DockWidgetMovable)
+			self.setSizePolicy(QtGui.QSizePolicy.Fixed,QtGui.QSizePolicy.Fixed)
 
 		class CommonControls(BaseWidget,QtGui.QFrame):
 			
 			class Layout(BaseLayout,QtGui.QVBoxLayout):
 				def init(self):
 					self._up.setLayout(self)
+					self.setContentsMargins(5,5,5,5)
+					self.setSpacing(5)
+					
+			class LeftOrRight(BaseWidget,QtGui.QWidget):
+				def init(self):
+					self._up.Layout.addWidget(self)
+					self.hide()
+				class Layout(BaseLayout,QtGui.QHBoxLayout):
+					def init(self):
+						self._up.setLayout(self)
+						self.setContentsMargins(0,0,0,0)
+						self.setSpacing(0)
+				class Left(BaseWidget,QtGui.QRadioButton):
+					def init(self):
+						self.setText(self.tr('Left'))
+						self._up.Layout.addWidget(self)
+				class Right(BaseWidget,QtGui.QRadioButton):
+					def init(self):
+						self.setText(self.tr('Right'))
+						self._up.Layout.addWidget(self)
 					
 			class CaptureButton(BaseWidget,QtGui.QPushButton):
 				def init(self):
 					self._up.Layout.addWidget(self)
 					self.setText(self.tr('Capture'))
+					self.setIcon(QtGui.QIcon(':/camera-24.png'))
+					self.setIconSize(QtCore.QSize(24,24))
 					
 				def onclicked(self):
 					captureThreads = []
@@ -228,6 +258,7 @@ class MainWindow(BaseWidget,QtGui.QMainWindow):
 			self.setWindowTitle(self.tr('Thumbnails'))
 			self._up.addDockWidget(Qt.RightDockWidgetArea,self)
 			self.setWidget(self.ThumbnailScrollArea)
+			self.setFeatures(QtGui.QDockWidget.DockWidgetFloatable|QtGui.QDockWidget.DockWidgetMovable)
 
 		class ThumbnailScrollArea(BaseWidget,QtGui.QScrollArea):
 			def init(self):
@@ -241,7 +272,7 @@ class MainWindow(BaseWidget,QtGui.QMainWindow):
 		QtGui.QMessageBox.about(self,'About scan manager',
 			"""
 			<p>The <b>scan manager</b> automates the use of USB-tethered cameras with book scanners
-			(see <a href="http://www.diybookscanner.com">www.diybookscanner.com<a>)</p>
+			(see <a href="http://www.diybookscanner.org">www.diybookscanner.org<a>)</p>
 			<p>This software and its associated source code is provided for free under the LGPL v3.0 license (full text <a href="http://www.gnu.org/copyleft/lesser.html">here</a>)</p> 
 			<p>For more information please contact Oren Goldschmidt at <a href="mailto:og200@hotmail.com">og200@hotmail.com</a></p> 
 			"""

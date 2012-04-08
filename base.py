@@ -5,6 +5,7 @@ Modules will usually import this early on via an "import *" to provide basic fun
 """
 
 import os.path
+import platform
 
 class NODEFAULT:
 	"""
@@ -102,3 +103,17 @@ def smBasePath():
 		# this is present if the python package has been converted to an exe with cx_Freeze  
 		path = os.path.join(os.path.split(path)[:-1])[0]
 	return path
+
+
+def smDataPath():
+	"""
+	Return the location where the app should store its data 
+	"""
+	base = os.path.expanduser('~')
+	if platform.system().lower() == 'windows':
+		target = os.path.join(base,'scanmanager')
+	else:
+		target = os.path.join(base,'.scanmanager')
+	if not os.path.exists(target):
+		os.makedirs(target)
+	return target

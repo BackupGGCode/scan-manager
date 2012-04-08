@@ -243,6 +243,12 @@ class Camera(object):
 		@return: bool 
 		"""
 	@abstract
+	def hasCapture(self):
+		"""
+		Returns true if the camera supports remote capture
+		@return: bool 
+		"""
+	@abstract
 	def startViewfinder(self,callback):
 		""" 
 		Start the live view feature
