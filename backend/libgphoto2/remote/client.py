@@ -2,7 +2,7 @@ import Pyro4
 import Pyro4.utils.flame
 import subprocess
 import time
-
+import sys
 import os
 
 
@@ -25,8 +25,11 @@ class GPhotoClient(object):
 		if os.path.exists(uriPath):
 			os.remove(uriPath)
 
-		process = subprocess.Popen((os.path.join(basePath,'remote','bin','gphotoremote.exe'),os.path.join(basePath,'remote','server.py'),basePath))
+		os.environ['CYGWIN'] = 'nodosfilewarning'
 		self.opened = True
+		self.process = subprocess.Popen(
+			(os.path.join(basePath,'remote','bin','gphotoremote.exe'),os.path.join(basePath,'remote','server.py'),basePath),
+		)
 
 		start = time.time()
 		while not os.path.exists(uriPath):
@@ -39,17 +42,19 @@ class GPhotoClient(object):
 		self.api.open(dllDir=dllDir)
 
 	def close(self):
-	
+		print 'client close'
 		if not self.opened:
 			return
 		
 		try: self.api.close()
 		except: pass
 			
-		try: self.api.stop()
+		try: 
+			self.api.stop()
+			print 'client close stop worked'
 		except: pass
 		
-		try: process.terminate()
+		try: self.process.terminate()
 		except: pass
 		
 		try:
@@ -58,6 +63,12 @@ class GPhotoClient(object):
 				os.remove(uriPath)
 		except:
 			pass
+		
+	def __getattr__(self,k):
+		return getattr(self.api,k)
+	
+	def __del__(self):
+		self.close()
 
 if __name__ == '__main__':
 	client = GPhotoClient()

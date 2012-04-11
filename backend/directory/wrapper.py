@@ -1,7 +1,5 @@
 """
-Wrap the API in the standard API interface
-
-The rest of the files here define a fully featured manufacturer's API while this file wraps it in a simplified generic interface
+This wrapper actually implements the backend since it's so simple
 """
 
 from .. import interface

@@ -90,6 +90,9 @@ class BackendManager(object):
 
 
 	def formatException(self):
+		"""
+		Format a traceback and exception as a multi-line block of text
+		"""
 		excInfo = sys.exc_info()
 		lines = traceback.format_exception(*excInfo)
 		tb = ''.join(lines)
@@ -97,6 +100,9 @@ class BackendManager(object):
 	
 	
 	def formatAPIErrors(self):
+		"""
+		Pretty-print all the errors we encountered so far
+		"""
 		out = ''
 		for state in self.states:
 			if state.state in (APIState.ImportError,APIState.OpenError):
@@ -109,6 +115,9 @@ class BackendManager(object):
 	
 	
 	def __iter__(self):
+		"""
+		So you can just say C{for i in apis} to loop through the (opened) apis
+		"""
 		for i in self.states:
 			if i.state != APIState.Opened:
 				continue

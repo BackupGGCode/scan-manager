@@ -138,6 +138,9 @@ class API(object):
 			message = self.gp.gp_result_as_string(result)
 			raise GPhotoError(result,message)
 
+	def log(self,text):
+		print 'APILOG',text
+
 
 
 class PortInfoList(object):
@@ -425,26 +428,25 @@ class Camera(object):
 		self.api.checkedGP.gp_camera_get_about(self.c, PTR(txt), self.api.context)
 		return txt.text
 
-	def captureImage(self,destpath=None):
+	def captureImage(self):
 		path = structures.CameraFilePath()
 
 		rc = 0
 		for i in range(1 + retries):
 			rc = self.api.gp.gp_camera_capture(self.c, GP_CAPTURE_IMAGE, PTR(path), self.api.context)
-			if rc == 0: 
+			if rc == 0:
 				break
 			else: 
 				self.api.log('retrying image capture')
 		self.api.check(rc)
 
-		if destpath:
-			self.downloadFile(path.folder, path.name, destpath)
-		else:
-			return (path.folder, path.name)
+		cfile = CameraFile(self.api,self,path.folder,path.name)
+		self.api.register(cfile)
+		return cfile
 
 	def capturePreview(self, destpath = None):
 		path = structures.CameraFilePath()
-		cfile = CameraFile()
+		cfile = CameraFile(self.api,self)
 
 		rc = 0
 		for i in range(1 + retries):
@@ -494,14 +496,16 @@ class Camera(object):
 
 
 class CameraFile(object):
-	def __init__(self,cam=None,srcfolder=None,srcfilename=None):
+	def __init__(self,api,cam=None,srcfolder=None,srcfilename=None):
+		self.api = api
 		self.c = ctypes.c_void_p()
 		self.api.checkedGP.gp_file_new(PTR(self.c))
-		if cam:
+		if cam and srcfolder and srcfilename:
 			try:
-				self.api.checkedGP.gp_camera_file_get(cam,srcfolder,srcfilename,GP_FILE_TYPE_NORMAL,self.c,self.api.context)
+				self.api.checkedGP.gp_camera_file_get(cam.c,srcfolder,srcfilename,GP_FILE_TYPE_NORMAL,self.c,self.api.context)
 			except:
 				self.unref()
+				raise
 
 	def open(self, filename):
 		self.api.checkedGP.gp_file_open(PTR(self.c), filename)
@@ -532,6 +536,15 @@ class CameraFile(object):
 	
 	def setName(self, name):
 		self.api.checkedGP.gp_file_set_name(self.c, name)
+		
+	def getData(self):
+		datap = ctypes.c_void_p()
+		size = ctypes.c_ulong()
+		self.api.checkedGP.gp_file_get_data_and_size(self.c,PTR(datap),PTR(size))
+		if not size.value:
+			return None
+		data = ctypes.cast(datap,ctypes.POINTER(ctypes.c_char*size.value))
+		return str(data.contents.raw)
 
 	def __repr__(self):
 		return '<%s %s>'%(self.__class__.__name__,self.getName())
@@ -778,10 +791,15 @@ class CameraWidgetSimple(object):
 
 
 if __name__ == '__main__':
+	print 'main'
 	api = API()
-	api.open('..\win32')
-	
+	api.open('win32')
+	import time
 	cameras = api.getCameras()
 	for camera in cameras:
-		print camera.captureImage()
+		captured = camera.captureImage()
+		print captured
+		print 'data: %r'%captured.getData()[:10]
+		preview = camera.capturePreview()
+		print 'data p: %r'%preview.getData()[:10]
 

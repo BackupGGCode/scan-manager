@@ -224,7 +224,7 @@ class SetupWindow(BaseWidget,QtGui.QWidget):
 		def init(self):
 			self.addItem(self.tr('V: a camera for each side of the book'),Mode.V)
 			self.addItem(self.tr('Flat: a single camera capturing two pages at a time)'),Mode.Flat)
-			self.addItem(self.tr('Alternate: a single camera capturing pages that need to be interpolated'),Mode.Alternate)
+			#self.addItem(self.tr('Alternate: a single camera capturing pages that need to be interpolated'),Mode.Alternate)
 			self._up.Layout.addRow(self.tr('Operating mode:'),self)
 
 		def oncurrentIndexChanged(self,index):

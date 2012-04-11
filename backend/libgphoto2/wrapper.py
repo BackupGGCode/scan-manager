@@ -10,6 +10,7 @@ from backend import interface
 import os.path
 import platform
 import time
+import threading
 
 
 class API(interface.API):
@@ -35,16 +36,15 @@ class API(interface.API):
 		
 		if platform.system().lower() == 'windows':
 			from .remote import client
-			self.client = client.GPhotoClient()
-			self.client.open(basePath=os.path.join(smBasePath(),'backend','libgphoto2'))
-			self.api = self.client.api
+			self.api = client.GPhotoClient()
+			self.opened = True
+			self.api.open(basePath=os.path.join(smBasePath(),'backend','libgphoto2'))
 		else:
 			from . import api
 			self.api = api.API()
+			self.opened = True
 			self.api.open()
 		
-		self.opened = True
-
 
 	def getCameras(self):
 		out = []
@@ -56,8 +56,9 @@ class API(interface.API):
 
 
 	def close(self):
-		return
-	
+		'call close on libgphoto2 wrapper api object'
+		self.api.close()
+		
 	
 	
 class Camera(interface.Camera):
@@ -65,6 +66,7 @@ class Camera(interface.Camera):
 	def __init__(self,api,camera):
 		super(Camera,self).__init__(api)
 		self.camera = camera
+		self.viewfinderThread = None
 		self.opened = False
 		
 
@@ -77,6 +79,9 @@ class Camera(interface.Camera):
 			return
 		self.camera.init()
 		self.opened = True
+		self.properties = []
+		for property in self.api.propertyClasses:
+			self.properties.append(property(self))
 
 	
 	def hasViewfinder(self):
@@ -89,10 +94,13 @@ class Camera(interface.Camera):
 	
 	def capture(self):
 		captured = self.camera.captureImage()
+		data = captured.getData()
+		e = interface.CaptureCompleteEvent(self,data=data)
+		self.captureComplete.fire(e)
 	
 	
 	def getProperties(self):
-		return []
+		return self.properties
 
 	
 	def close(self):
@@ -104,17 +112,25 @@ class Camera(interface.Camera):
 		If we're running in manual mode, periodically check for new items on the device, fetch them, and fire a capture event
 		"""
 		pass
+
+	#
+	# Non-interface
+	#
 	
-	def handleViewfinderData(self,data):
-		e = interface.ViewfinderFrameEvent(self,data=data)
-		self.viewfinderFrame.fire(e)
+	def startViewfinder(self):
+		if self.viewfinderThread and not self.viewfinderThread.stopped:
+			return 
+		self.viewfinderThread = ViewfinderCaptureThread(self)
+		self.viewfinderThread.start() 
 
-
+	def stopViewfinder(self):
+		self.viewfinderThread.stopped = True
 
 	
-class ViewfinderCaptureThread(object):
+class ViewfinderCaptureThread(threading.Thread):
 	
 	def __init__(self,camera):
+		super(ViewfinderCaptureThread,self).__init__()
 		self.camera = camera
 		self.stopped = False
 		
@@ -123,11 +139,49 @@ class ViewfinderCaptureThread(object):
 			if self.stopped:
 				break
 			
-		previewFile = self.camera.capturePreview()
-		
+			previewFile = self.camera.camera.capturePreview()
+			data = previewFile.getData()
+			e = interface.ViewfinderFrameEvent(self.camera,data=data)
+			self.camera.viewfinderFrame.fire(e)
 		
 	def stop(self):
 		self.stopped = True
 		
 		
 		
+class GPhotoCameraButton(interface.CameraValueProperty):
+
+	def __init__(self,camera):
+		self.camera = camera
+		self.sdkCamera = camera.camera
+	
+	def getName(self):
+		return self.name
+	
+	def getIdent(self):
+		return self.propertyId
+
+	def getControlType(self):
+		return self.controlType
+		
+	def getRawValue(self):
+		return True
+
+
+class StartViewfinder(GPhotoCameraButton):
+	propertyId = '_START_VIEWFINDER'
+	name = 'Start viewfinder'
+	controlType = interface.ControlType.Button
+	def go(self):
+		self.camera.startViewfinder()
+
+		
+class StopViewfinder(GPhotoCameraButton):
+	propertyId = '_STOP_VIEWFINDER'
+	name = 'Stop viewfinder'
+	controlType = interface.ControlType.Button
+	def go(self):
+		self.camera.stopViewfinder()
+		
+
+API.propertyClasses = [StartViewfinder,StopViewfinder]

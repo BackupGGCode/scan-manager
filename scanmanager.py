@@ -25,16 +25,18 @@ def excepthook(excType, excValue, tracebackobj):
 
 
 if __name__ == '__main__':
-	
-	configureLogging()
-	app = App(sys.argv)
-	sys.excepthook = excepthook
-	app.exec_()
-	for api in backend.apis:
-		try: api.saveSettings()
+
+	try:
+		configureLogging()
+		app = App(sys.argv)
+		sys.excepthook = excepthook
+		app.exec_()
+	finally:
+		for api in backend.apis:
+			try: api.saveSettings()
+			except: pass
+			try: api.close()
+			except: pass
+		try: app.db.close()
 		except: pass
-		try: api.close()
-		except: pass
-	try: app.db.close()
-	except: pass
-	sys.exit()
+		print 'now exit'

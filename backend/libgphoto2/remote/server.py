@@ -7,6 +7,10 @@ import imp
 #import Pyro4.utils.flame
 
 #Pyro4.config.COMMTIMEOUT = 0.1
+Pyro4.config.POLLTIMEOUT = 0.1
+Pyro4.config.COMPRESSION = False
+Pyro4.config.SERVERTYPE = "multiplex"
+Pyro4.config.DETAILED_TRACEBACK = True
 
 basePath = sys.argv[2]
 
@@ -20,7 +24,7 @@ class RemoteAPI(api.API):
 		api.API.__init__(self,*args,**kargs)
 	
 	def stop(self):
-		print 'stopping'
+		print 'server stopping'
 		self.stopped = True
 	
 	def notStopped(self):
@@ -29,19 +33,22 @@ class RemoteAPI(api.API):
 	def register(self,o):
 		daemon.register(o)
 
-apiObject = RemoteAPI()
+try:
+	apiObject = RemoteAPI()
+		
+	daemon = Pyro4.Daemon()
+	uri = daemon.register(apiObject)
 	
-daemon = Pyro4.Daemon()
-uri = daemon.register(apiObject)
-
-uriPath = os.path.join(basePath,'remote','uri.txt') 
-
-f = open(uriPath,'wb')
-f.write(str(uri))
-f.close()
-#Pyro4.utils.flame.start(daemon)
-
-print uri
-daemon.requestLoop(loopCondition=apiObject.notStopped)
-print 'exitted'
-sys.exit()
+	uriPath = os.path.join(basePath,'remote','uri.txt')
+	
+	f = open(uriPath,'wb')
+	f.write(str(uri))
+	f.close()
+	#Pyro4.utils.flame.start(daemon)
+	
+	print uri
+	daemon.requestLoop(loopCondition=apiObject.notStopped)
+	print 'server after loop'
+finally:
+	print 'server exitted'
+	sys.exit()

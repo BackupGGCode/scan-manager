@@ -116,6 +116,7 @@ class MainWindow(BaseWidget,QtGui.QMainWindow):
 		# for solo mode
 		if self.app.settings.mode != Mode.V:
 			self.app.Camera2Dock.hide()
+			self.app.Preview2.hide()
 		
 		# give controls for each camera a change to do their own initialisation (maily reading initial data from the camera)
 		for ndx,camera in enumerate(self.app.cameras):
