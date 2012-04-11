@@ -3,9 +3,9 @@ import platform
 class Info(object):
     @classmethod
     def getName(cls):
-        return 'GPhoto API (libgphoto2) - Linux only'
+        return 'GPhoto2 API (libgphoto2)'
     
     @classmethod
     def isAvailable(cls):
-        return platform.system().lower() == 'linux'
+        return True
     

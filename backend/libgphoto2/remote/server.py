@@ -4,11 +4,13 @@ import struct
 import os
 import sys
 import imp
-import Pyro4.utils.flame
+#import Pyro4.utils.flame
 
 #Pyro4.config.COMMTIMEOUT = 0.1
 
-sys.path = [r'.'] + sys.path
+basePath = sys.argv[2]
+
+sys.path = [basePath] + sys.path
 import api
 
 class RemoteAPI(api.API):
@@ -32,10 +34,12 @@ apiObject = RemoteAPI()
 daemon = Pyro4.Daemon()
 uri = daemon.register(apiObject)
 
-f = open('uri.txt','wb')
+uriPath = os.path.join(basePath,'remote','uri.txt') 
+
+f = open(uriPath,'wb')
 f.write(str(uri))
 f.close()
-Pyro4.utils.flame.start(daemon)
+#Pyro4.utils.flame.start(daemon)
 
 print uri
 daemon.requestLoop(loopCondition=apiObject.notStopped)

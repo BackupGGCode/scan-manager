@@ -66,7 +66,7 @@ class BackendManager(object):
 			try:
 				module = importlib.import_module('.%s.wrapper'%backend,__name__)
 			except:
-				self.states.append(BackendState(info=info,state=APIState.ImportError))
+				self.states.append(BackendState(info=info,state=APIState.ImportError,error=self.formatException()))
 			else:
 				self.states.append(BackendState(info=info,state=APIState.Imported,module=module))
 

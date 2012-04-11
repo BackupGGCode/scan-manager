@@ -330,6 +330,7 @@ class CameraAbilitiesList(object):
 			ab = CameraAbilities(self.api)
 			self.api.checkedGP.gp_abilities_list_get_abilities(self.c, k, PTR(ab.c))
 			self.api.register(ab)
+			self._cache[k] = ab
 			return ab
 
 	def __repr__(self):
@@ -353,16 +354,6 @@ class CameraAbilities(object):
 		raise KeyError(k)
 	
 
-	def getCamera(self):
-		raise Exception('not done')
-		camera = Camera(self.api,autoInit=False)
-		
-		
-		#self.api.checkedGP.gp_camera_set_port_info(camera.c,portInfo)
-		self.api.checkedGP.gp_camera_set_abilities(camera.c,self.c)
-		camera.init()
-		return camera
-	
 	def pprint(self,indent=''):
 		out = ''
 		out += indent + '<%s 0x%X>\n'%(self.__class__.__name__,id(self))
@@ -447,7 +438,7 @@ class Camera(object):
 		self.api.check(rc)
 
 		if destpath:
-			self.download_file(path.folder, path.name, destpath)
+			self.downloadFile(path.folder, path.name, destpath)
 		else:
 			return (path.folder, path.name)
 
@@ -467,6 +458,7 @@ class Camera(object):
 		if destpath:
 			cfile.save(destpath)
 		else:
+			self.api.register(cfile)
 			return cfile
 
 	def downloadFile(self, srcfolder, srcfilename, destpath):
@@ -481,7 +473,23 @@ class Camera(object):
 		window = CameraWidget(GP_WIDGET_WINDOW)
 		self.api.checkedGP.gp_camera_get_config(self.c, PTR(window.c), self.api.context)
 		window.populateChildren()
+		self.api.register(window)
 		return window
+
+	def getAbilities(self):
+		ab = CameraAbilities()
+		self.api.checkedGP.gp_camera_get_abilities(self.c, PTR(ab.c))
+		self.api.register(ab)
+		return ab
+	def setAbilities(self, ab):
+		self.api.checkedGP.gp_camera_set_abilities(self.c, ab.c)
+	abilities = property(getAbilities, setAbilities)
+
+	def getModel(self):
+		return self.model
+
+	def getPort(self):
+		return self.port
 
 
 
@@ -645,22 +653,26 @@ class CameraWidget(object):
 		w = CameraWidget()
 		self.api.checkedGP.gp_widget_get_child(self.c, child_number, PTR(w.c))
 		self.api.checkedGP.gp_widget_ref(w.c)
+		self.api.register(w)
 		return w
 
 	def getChildByLabel(self, label):
 		w = CameraWidget()
 		self.api.checkedGP.gp_widget_get_child_by_label(self.c, label, PTR(w.c))
+		self.api.register(w)
 		return w
 
 	def getChildById(self, id):
 		w = CameraWidget()
 		self.api.checkedGP.gp_widget_get_child_by_id(self.c, id, PTR(w.c))
+		self.api.register(w)
 		return w
 
 	def getChildByName(self, name):
 		w = CameraWidget()
 		# this fails in 2.4.6 (Ubuntu 9.10)
 		self.api.checkedGP.gp_widget_get_child_by_name(self.c, name, PTR(w.c))
+		self.api.register(w)
 		return w
 
 	def __getitem__(self,k):
@@ -676,19 +688,23 @@ class CameraWidget(object):
 	def getChildren(self):
 		children = []
 		for i in range(self.countChildren()):
-			children.append(self.getChild(i))
+			child = self.getChild(i)
+			children.append(child)
+			self.api.register(child)
 		return children
 	children = property(getChildren)
 
 	def getParent(self):
 		w = CameraWidget()
 		self.api.checkedGP.gp_widget_get_parent(self.c, PTR(w.c))
+		self.api.register(w)
 		return w
 	parent = property(getParent)
 
 	def getRoot(self):
 		w = CameraWidget()
 		self.api.checkedGP.gp_widget_get_root(self.c, PTR(w.c))
+		self.api.register(w)
 		return w
 	root = property(getRoot)
 
@@ -751,6 +767,7 @@ class CameraWidget(object):
 
 	def __repr__(self):
 		return "%s:%s:%s:%s:%s" % (self.label, self.name, self.info, self.typestr, self.value)
+
 
 
 
