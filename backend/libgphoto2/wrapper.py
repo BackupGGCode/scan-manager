@@ -11,6 +11,7 @@ import os.path
 import platform
 import time
 import threading
+import constants
 
 
 class API(interface.API):
@@ -23,6 +24,7 @@ class API(interface.API):
 	def __init__(self,*args,**kargs):
 		super(API,self).__init__(*args,**kargs)
 		self.opened = False
+		self.cameras = None
 	
 	
 	def getName(self):
@@ -52,12 +54,17 @@ class API(interface.API):
 		for apiCamera in apiCameras:
 			camera = Camera(self,apiCamera)
 			out.append(camera)
+		self.cameras = out
 		return out
 
 
 	def close(self):
-		'call close on libgphoto2 wrapper api object'
-		self.api.close()
+		if self.cameras:
+			for camera in self.cameras:
+				try: camera.exit()
+				except: pass
+		if self.opened:
+			self.api.close()
 		
 	
 	
@@ -68,6 +75,8 @@ class Camera(interface.Camera):
 		self.camera = camera
 		self.viewfinderThread = None
 		self.opened = False
+		self.config = None
+		self.configWidgets = {} 
 		
 
 	def getName(self):	
@@ -77,13 +86,30 @@ class Camera(interface.Camera):
 	def open(self):
 		if self.opened:
 			return
-		self.camera.init()
 		self.opened = True
+		self.camera.init()
 		self.properties = []
-		for property in self.api.propertyClasses:
-			self.properties.append(property(self))
-
+		
+		# try to wake the camera up so we get a complete set of properties to work with
+		try:
+			imageFile = self.camera.captureImage()
+		except:
+			pass
+			
+		self.configurationFromCamera()
+		for section in self.config['children']:
+			for widget in section['children']:
+				if widget['type'] == constants.GP_WIDGET_BUTTON:
+					property = GPhotoCameraButton(self,widget['name']) 
+				else: 
+					property = GPhotoCameraValueProperty(self,widget['name'])
+				property.section = section
+				self.properties.append(property)
 	
+		for property in self.api.propertyClasses:
+			self.properties.append(property(self,None))
+			
+			
 	def hasViewfinder(self):
 		return True
 
@@ -104,7 +130,10 @@ class Camera(interface.Camera):
 
 	
 	def close(self):
-		self.camera.close()
+		if not self.opened:
+			return
+		self.camera.exit()
+			
 
 	
 	def ontimer(self):
@@ -123,9 +152,56 @@ class Camera(interface.Camera):
 		self.viewfinderThread = ViewfinderCaptureThread(self)
 		self.viewfinderThread.start() 
 
+
 	def stopViewfinder(self):
 		self.viewfinderThread.stopped = True
 
+
+	def configurationToCamera(self):
+		n = 0
+		toClear = []
+		for section in self.config['children']:
+			for widget in section['children']:
+				n += 1
+				if widget['changed']:
+					toClear.append(widget)
+		if toClear:
+			s = ', '.join(['%s=%r'%(i['label'],i['value']) for i in toClear])
+			try:
+				self.camera.setConfiguration(self.config)
+			except:
+				print 'Failed setting camera properties %s'%s
+			else:
+				print 'Succeeded in setting camera properties %s'%s
+				
+			for i in toClear:
+				i['changed'] = False
+		else:
+			print 'nothing to set'
+			
+				
+	def configurationFromCamera(self):
+		old = dict()
+		old.update(self.configWidgets)
+		changed = []
+		
+		self.config = self.camera.getConfiguration()
+		for section in self.config['children']:
+			for widget in section['children']:
+				self.configWidgets[widget['name']] = widget
+				if (widget['name'] in old) and (widget['value'] != old[widget['name']]['value']):
+					changed.append(widget)
+		
+		changedString = ','.join(['%s=%r'%(i['label'],i['value']) for i in changed])
+		print 'CHANGED',changedString
+		
+		return changed
+	
+	
+	def getWidget(self,id):
+		return self.configWidgets[id]
+	
+	
 	
 class ViewfinderCaptureThread(threading.Thread):
 	
@@ -146,42 +222,141 @@ class ViewfinderCaptureThread(threading.Thread):
 		
 	def stop(self):
 		self.stopped = True
-		
-		
-		
-class GPhotoCameraButton(interface.CameraValueProperty):
 
-	def __init__(self,camera):
-		self.camera = camera
-		self.sdkCamera = camera.camera
+		
+WidgetToControlType = {
+	constants.GP_WIDGET_WINDOW: None,
+	constants.GP_WIDGET_SECTION: None,
+	constants.GP_WIDGET_TEXT: interface.ControlType.LineEdit,
+	constants.GP_WIDGET_RANGE: interface.ControlType.Slider,
+	constants.GP_WIDGET_TOGGLE: interface.ControlType.Checkbox,
+	constants.GP_WIDGET_RADIO: interface.ControlType.Combo,
+	constants.GP_WIDGET_MENU: interface.ControlType.Combo,
+	constants.GP_WIDGET_BUTTON: interface.ControlType.Button,
+	constants.GP_WIDGET_DATE: interface.ControlType.LineEdit, ### TODO: Add a date field
+}
+
+def cached(f):
+	def withCache(*args,**kargs):
+		self = args[0]
+		if f.__name__ not in self._cache:
+			rc = f(*args,**kargs)
+			self._cache[f.__name__] = rc
+		return self._cache[f.__name__]
+	return withCache
+
+
+		
+class GPhotoCameraValueProperty(interface.CameraValueProperty):
 	
+	def __init__(self,camera,widgetId):
+		self.camera = camera
+		self.widgetId = widgetId
+
 	def getName(self):
-		return self.name
+		return self.widget['label']
 	
 	def getIdent(self):
-		return self.propertyId
+		return self.widget['name']
 
 	def getControlType(self):
-		return self.controlType
+		return WidgetToControlType[self.widget['type']]
 		
 	def getRawValue(self):
+		return self.widget['value']
+	
+	def setRawValue(self,v):
+		if self.widget['value'] != v:
+			print 'set raw changed',v
+			self.widget['value'] = v
+			self.widget['changed'] = True
+			self.camera.configurationToCamera()
+			self.camera.configurationFromCamera()
+		else:
+			print 'set raw no change',v
+		
+	def rawToDisplay(self,rawValue):
+		return rawValue
+		
+	def displayToRaw(self,displayValue):
+		return displayValue
+		
+	def getMin(self):
+		return self.widget['range'][0]
+	
+	def getMax(self):
+		return self.widget['range'][1]
+	
+	def getStep(self):
+		return self.widget['range'][2]
+	
+	def getPossibleValues(self):
+		return [(i,i) for i in self.widget['choices']]
+	
+	def isSupported(self):
 		return True
+	
+	def isReadOnly(self):
+		return self.widget['readonly']
+	
+	def getSection(self):
+		return self.section['label']
+	
+	#
+	# Non-interface
+	#
+	def getWidget(self):
+		return self.camera.getWidget(self.widgetId)
+	widget = property(getWidget)
+	
+
+
+class GPhotoCameraButton(GPhotoCameraValueProperty):
+
+	def getRawValue(self):
+		return True
+
+	#def go(self,callback=None):
+	#	if callback is None: callback = self.done
+	#	self.widget.setValue(callback)
+	
+	#def done(self,camera,widget,context):
+	#	pass
 
 
 class StartViewfinder(GPhotoCameraButton):
 	propertyId = '_START_VIEWFINDER'
 	name = 'Start viewfinder'
+	section = 'Camera Actions'
 	controlType = interface.ControlType.Button
+	def getName(self):
+		return self.name
+	def getId(self):
+		return self.propertyId
+	def getControlType(self):
+		return interface.ControlType.Button
 	def go(self):
 		self.camera.startViewfinder()
+	def getSection(self):
+		return self.section
 
 		
 class StopViewfinder(GPhotoCameraButton):
 	propertyId = '_STOP_VIEWFINDER'
 	name = 'Stop viewfinder'
+	section = 'Camera Actions'
 	controlType = interface.ControlType.Button
+	def getName(self):
+		return self.name
+	def getId(self):
+		return self.propertyId
+	def getControlType(self):
+		return interface.ControlType.Button
 	def go(self):
 		self.camera.stopViewfinder()
+	def getSection(self):
+		return self.section
 		
+
 
 API.propertyClasses = [StartViewfinder,StopViewfinder]

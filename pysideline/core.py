@@ -45,7 +45,21 @@ class BaseInstantiable(object):
 	__metaclass__ = CounterMetaclass
 
 	def __init__(self,*args,**kargs):
+		if 'noAutoInstantiate' in kargs:
+			noAutoInstantiate = kargs['noAutoInstantiate']
+			del(kargs['noAutoInstantiate'])
+		else:
+			noAutoInstantiate = False
+			
 		super(BaseInstantiable,self).__init__(*args,**kargs)
+		
+		if not noAutoInstantiate:
+			parent = args[0] or kargs.get('parent',None)
+			self._up = parent
+			toInit = self._autoInstantiate()
+			for o in toInit:
+				o.init()
+			self.init()
 		
 		
 	def _autoInstantiate(self,recurse=True):
@@ -54,6 +68,9 @@ class BaseInstantiable(object):
 		
 		If these classes are also subclasses of BaseWidget then self is set as their parent
 		"""
+		if hasattr(self,'_findSignals') and not hasattr(self,'_signals'):
+			self._findSignals()
+
 		toInstantiate = []
 		for k in dir(self):
 		
@@ -76,9 +93,9 @@ class BaseInstantiable(object):
 		done = []
 		for k,v in toInstantiate:
 			if hasattr(v,'args'):
-				o = v(*v.args)
+				o = v(*v.args,noAutoInstantiate=True)
 			else:
-				o = v()
+				o = v(noAutoInstantiate=True)
 			self._registerSubObject(k,o)
 			if isinstance(self,QtGui.QWidget) and isinstance(o,QtGui.QWidget):
 				o.setParent(self)
@@ -118,7 +135,7 @@ class BaseWidget(BaseInstantiable):
 	"""	
 	
 	def __init__(self,*args,**kargs):
-		super(BaseInstantiable,self).__init__(*args,**kargs)
+		super(BaseWidget,self).__init__(*args,**kargs)
 		self._findSignals()
 		
 		
@@ -154,34 +171,15 @@ class BaseLayout(BaseInstantiable):
 class BaseDialog(BaseWidget):
 
 	def __init__(self,*args,**kargs):
-		super(BaseInstantiable,self).__init__(*args,**kargs)
-		self._findSignals()
-		self._up = self.parent()
-		toInit = self._autoInstantiate()
-		for o in toInit:
-			o.init()
-		self.init()
+		super(BaseDialog,self).__init__(*args,**kargs)
 		
-		
-	def init(self,*args,**kargs):
-		pass
-
-
 
 class BaseRootInstantiable(BaseInstantiable):
 
 	def __init__(self,*args,**kargs):
-		super(BaseRootInstantiable,self).__init__(*args,**kargs)
 		self._subObjects = {}
-		toInit = self._autoInstantiate()
-		for o in toInit:
-			o.init()
-		self.init()
+		super(BaseRootInstantiable,self).__init__(*args,**kargs)
 		
-		
-	def init(self,*args,**kargs):
-		pass
-
 		
 	def _registerSubObject(self,k,v):
 		""" 

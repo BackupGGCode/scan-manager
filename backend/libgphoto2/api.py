@@ -6,6 +6,7 @@ import os
 import ctypes
 import time
 import sys
+import weakref
 
 sys.path = ['.'] + sys.path
 
@@ -23,34 +24,42 @@ unmount_cmd = 'gvfs-mount -s gphoto2'
 
 
 
-class GPhotoError(Exception):
-	def __init__(self, result, message):
-		self.result = result
-		self.message = message
-	def __str__(self):
-		return '%s (%s)'%(self.message,self.result)
+class CheckedTracedFunction(object):
 	
+	def __init__(self,api,f,checked=False,traced=False):
+		self.api = api
+		self.f = f
+		self.checked = checked
+		self.traced = traced
+	
+	def __call__(self,*args,**kargs):
+		if self.traced: self.api.traceDLLCallStart(self.f,args,kargs)
+		result = self.f(*args,**kargs)
+		if self.traced: self.api.traceDLLCallEnd(self.f,args,kargs,result)
+		if self.checked: self.api.check(result)
+		return result
+	
+	def _getRestype(self):
+		return self.f.restype
+	def _setRestype(self,v):
+		self.f.restype = v
+	restype = property(_getRestype,_setRestype)
 
 
-class CheckedDLL(object):
+class CheckedTracedDLL(object):
 	
-	def __init__(self,api,dll):
+	def __init__(self,api,dll,checked=False,traced=False):
 		self.api = api
 		self.dll = dll
+		self.checked = checked
+		self.traced = traced
 		
 	def __getattr__(self,k):
-		function = getattr(self.dll,k)
-
-		def withCheck(*args,**kargs):
-			result = function(*args,**kargs)
-			self.api.check(result)
-			return result
-		
-		return withCheck
+		f = getattr(self.dll,k)
+		return CheckedTracedFunction(self.api,f,checked=self.checked,traced=self.traced)
 		
 	def __hasattr__(self,k):
 		return hasattr(self.dll,k)
-	
 	
 
 class API(object):
@@ -58,8 +67,9 @@ class API(object):
 	def __init__(self):
 		self.portInfoList = None
 		self.cameraAbilitiesList = None
+		self.objects = weakref.WeakValueDictionary()
 	
-	def open(self,dllDir='.'):
+	def open(self,dllDir='.',trace=False):
 		
 		global gp, context, PortInfo
 
@@ -72,11 +82,19 @@ class API(object):
 		else:
 			libgphoto2dll = 'libgphoto2.so'
 			libgphoto2portdll = 'libgphoto2_port-0.so'
-			
-		self.gp = ctypes.CDLL(libgphoto2dll)
-		self.gpp = ctypes.CDLL(libgphoto2portdll)
-		self.checkedGP = CheckedDLL(self,self.gp)
-		self.checkedGPP = CheckedDLL(self,self.gpp)
+		
+		gp = ctypes.CDLL(libgphoto2dll)
+		gpp = ctypes.CDLL(libgphoto2portdll)
+		if trace:
+			self.gp = CheckedTracedDLL(self,gp,checked=False,traced=False)
+			self.gpp = CheckedTracedDLL(self,gpp,checked=False,traced=True)
+			self.checkedGP = CheckedTracedDLL(self,gp,checked=True,traced=True)
+			self.checkedGPP = CheckedTracedDLL(self,gpp,checked=True,traced=True)
+		else:
+			self.gp = gp
+			self.gpp = gpp
+			self.checkedGP = CheckedTracedDLL(self,gp,checked=True,traced=False)
+			self.checkedGPP = CheckedTracedDLL(self,gpp,checked=True,traced=False)
 		self.context = self.gp.gp_context_new()
 
 	def getVersion(self,verbose=True):
@@ -128,19 +146,44 @@ class API(object):
 		return out
 
 
+	def getByAddress(self,address):
+		return self.objects[address]
+			
+
 	def register(self,o):
-		pass
+		if not hasattr(o,'c'):
+			return
+		try: 
+			address = ctypes.addressof(o.c)
+		except:
+			return
+		self.objects[address] = o
 
 	
 	def check(self,result):
 		if result < 0:
 			self.gp.gp_result_as_string.restype = ctypes.c_char_p
 			message = self.gp.gp_result_as_string(result)
-			raise GPhotoError(result,message)
+			raise Exception('GPhoto Error - %s (%s)'%(message,result))
+
 
 	def log(self,text):
 		print 'APILOG',text
 
+
+	def traceDLLCallStart(self,function,args,kargs):
+		sArgs = ['%r'%i for i in args]
+		sArgs += ['%s=%r'%(k,v) for k,v in kargs.items()]
+		s = '%s(%s)'%(function.__name__,','.join(sArgs))
+		print s
+		
+	def traceDLLCallEnd(self,function,args,kargs,result):
+		sArgs = ['%r'%i for i in args]
+		sArgs += ['%s=%r'%(k,v) for k,v in kargs.items()]
+		s = '%s(%s) -> %r'%(function.__name__,','.join(sArgs),result)
+		print s
+		
+		
 
 
 class PortInfoList(object):
@@ -383,18 +426,19 @@ class Camera(object):
 		if self.initialized:
 			return
 		for i in range(1 + retries):
-			rc = self.api.checkedGP.gp_camera_init(self.c, self.api.context)
+			rc = self.api.gp.gp_camera_init(self.c, self.api.context)
 			if rc == 0:
 				break
 			elif rc == -60:
-				os.system(unmount_cmd)
+				if not WIN32:
+					os.system(unmount_cmd)
 				time.sleep(1)
 				self.api.log('retrying camera initialisation')
 		self.api.check(rc)
 		self.initialized = True
 
 	def reinit(self):
-		self.api.checkedGP.gp_camera_free(self.c)
+		self.api.checkedGP.gp_camera_unref(self.c)
 		self.initialized = False
 		self.init()
 
@@ -472,11 +516,62 @@ class Camera(object):
 		self.api.checkedGP.gp_camera_trigger_capture(self.c, self.api.context)
 
 	def getConfig(self):
-		window = CameraWidget(GP_WIDGET_WINDOW)
+		window = CameraWindow(self.api,self)
 		self.api.checkedGP.gp_camera_get_config(self.c, PTR(window.c), self.api.context)
-		window.populateChildren()
 		self.api.register(window)
+		self.window = window
 		return window
+	def setConfig(self, window):
+		self.api.checkedGP.gp_camera_set_config(self.c, window.c, self.api.context)
+		
+		
+	def getConfiguration(self):
+
+		def widgetToDict(widget):
+			type = widget.getType()
+			readonly = widget.getReadonly()
+			if not readonly:
+				value = widget.getValue()
+			else:
+				value = None
+			out = dict(
+				id = widget.getId(),
+				name = widget.getName(),
+				label = widget.getLabel(),
+				type = type,
+				info = widget.getInfo(),
+				value = value,
+				readonly = readonly,
+				changed = 0,
+				children = [],
+			)
+			if type in (GP_WIDGET_MENU,GP_WIDGET_RADIO):
+				out['choices'] = widget.getChoices()
+			elif type == GP_WIDGET_RANGE:
+				out['range'] = widget.getRange()
+			elif type in (GP_WIDGET_WINDOW,GP_WIDGET_SECTION):
+				for child in widget.getChildren():
+					out['children'].append(widgetToDict(child))
+			return out
+		
+		self.getConfig()
+		return widgetToDict(self.window)
+			
+
+	def setConfiguration(self,window):
+		if not hasattr(self,'window'):
+			self.getConfig()
+		realWindow = self.window
+		for section in window['children']:
+			realSection = None
+			for widget in section['children']:
+				if widget['changed']:
+					if not realSection:
+						realSection = realWindow.getChildById(section['id'])
+					realWidget = realSection.getChildById(widget['id'])
+					realWidget.setValue(widget['value'])
+		self.setConfig(realWindow)
+					
 
 	def getAbilities(self):
 		ab = CameraAbilities()
@@ -557,21 +652,22 @@ class CameraWidget(object):
 	def __init__(self,api,type=None,label=''):
 		self.api = api
 		self.c = ctypes.c_void_p()
-		if kind is not None:
+		self._childCache = {}
+		self.created = False
+		if type is not None:
+			self.created = True
 			self.api.checkedGP.gp_widget_new(type,label,PTR(self.c))
 			self.api.checkedGP.gp_widget_ref(self.c)
-
+			
 	def ref(self):
 		self.api.checkedGP.gp_widget_ref(self.c)
 
 	def unref(self):
 		self.api.checkedGP.gp_widget_unref(self.c)
 
-	def __del__(self):
-		# TODO fix this or find a good reason not to
-		#print "widget(%s) __del__" % self.name
-		#check(gp.gp_widget_unref(self._w))
-		pass
+	#def __del__(self):
+	#	if self.created:
+	#		self.api.checkedGP.gp_widget_unref(self.c)
 
 	def getInfo(self):
 		info = ctypes.c_char_p()
@@ -596,7 +692,7 @@ class CameraWidget(object):
 	id = property(getId)
 
 	def setChanged(self, changed):
-		self.api.checkedGP.gp_widget_set_changed(self.c, changed)
+		self.api.checkedGP.gp_widget_set_changed(self.c, int(changed))
 	def getChanged(self):
 		return self.api.checkedGP.gp_widget_changed(self.c)
 	changed = property(getChanged, setChanged)
@@ -628,29 +724,46 @@ class CameraWidget(object):
 	label = property(getLabel,setLabel)
 
 	def getValue(self):
-		value = ctypes.c_void_p()
-		rc = self.api.gp.gp_widget_get_value(self.c, PTR(value))
-		if self.type in [GP_WIDGET_MENU, GP_WIDGET_RADIO, GP_WIDGET_TEXT]:
-			value = ctypes.cast(value.value, ctypes.c_char_p)
-		elif self.type == GP_WIDGET_RANGE:
-			value = ctypes.cast(value.value, ctypes.POINTER(ctypes.c_float))
-		elif self.type in [GP_WIDGET_TOGGLE, GP_WIDGET_DATE]:
-			#value = ctypes.cast(value.value, ctypes.c_int_p)
-			pass
-		else:
+		if self.type in (GP_WIDGET_WINDOW,GP_WIDGET_SECTION,GP_WIDGET_RANGE):
 			return None
-		self.api.check(rc)
-		return value.value
-	def setValue(self, value):
+		value = ctypes.c_void_p()
+		rc = self.api.checkedGP.gp_widget_get_value(self.c, PTR(value))
 		if self.type in (GP_WIDGET_MENU, GP_WIDGET_RADIO, GP_WIDGET_TEXT):
-			value = ctypes.c_char_p(value)
+			value = ctypes.cast(value.value, ctypes.c_char_p)
+			value = value.value
 		elif self.type == GP_WIDGET_RANGE:
-			value = ctypes.POINTER(ctypes.c_float)(value) # this line not tested
+			if value.value is None:
+				return None
+			value = ctypes.cast(value, ctypes.POINTER(ctypes.c_float))
+			value = value.contents.value
 		elif self.type in (GP_WIDGET_TOGGLE, GP_WIDGET_DATE):
-			value = PTR(ctypes.c_int(value))
+			#value = ctypes.cast(value.value, ctypes.POINTER(ctypes.c_int))
+			return
+		elif self.type == GP_WIDGET_BUTTON:
+			raise Exception('Getting a value for a GP_WIDGET_BUTTON should return a CameraWidgetCallback but we haven\'t built that yet')
 		else:
-			return None # this line not tested
-		self.api.checkedGP.gp_widget_set_value(self.c, value)
+			raise Exception('Unknown widget type %r'%self.type)
+		self.api.check(rc)
+		return value
+	def setValue(self, value):
+		if value is None:
+			return
+		if self.type in (GP_WIDGET_WINDOW,GP_WIDGET_SECTION):
+			return None
+		elif self.type in (GP_WIDGET_MENU, GP_WIDGET_RADIO, GP_WIDGET_TEXT):
+			v = ctypes.c_char_p(value)
+		elif self.type == GP_WIDGET_RANGE:
+			v = PTR(ctypes.c_float(float(value)))
+		elif self.type in (GP_WIDGET_TOGGLE, GP_WIDGET_DATE):
+			v = PTR(ctypes.c_int(int(value)))
+		elif self.type == GP_WIDGET_BUTTON:
+			v = structures.CameraWidgetCallback(
+				lambda cameraAddress,widgetAddress,context: 
+					value( self.api.getByAddress(cameraAddress), self.api.getByAddress(widgetAddress) )
+			)
+		else:
+			raise Exception('Unknown widget type %r'%self.type)
+		self.api.checkedGP.gp_widget_set_value(self.c,v)
 	value = property(getValue, setValue)
 
 	def append(self, child):
@@ -660,33 +773,40 @@ class CameraWidget(object):
 		self.api.checkedGP.gp_widget_prepend(self.c, child.c)
 
 	def countChildren(self):
-		return self.api.gp_widget_count_children(self.c)
+		return self.api.gp.gp_widget_count_children(self.c)
 
 	def getChild(self, child_number):
-		w = CameraWidget()
-		self.api.checkedGP.gp_widget_get_child(self.c, child_number, PTR(w.c))
-		self.api.checkedGP.gp_widget_ref(w.c)
-		self.api.register(w)
-		return w
+		if child_number not in self._childCache:
+			w = CameraWidget(self.api)
+			self.api.checkedGP.gp_widget_get_child(self.c, child_number, PTR(w.c))
+			self.api.checkedGP.gp_widget_ref(w.c)
+			self._childCache[child_number] = w
+			#self.api.register(w)
+		return self._childCache[child_number]
 
 	def getChildByLabel(self, label):
-		w = CameraWidget()
-		self.api.checkedGP.gp_widget_get_child_by_label(self.c, label, PTR(w.c))
-		self.api.register(w)
-		return w
+		if label not in self._childCache:
+			w = CameraWidget(self.api)
+			self.api.checkedGP.gp_widget_get_child_by_label(self.c, label, PTR(w.c))
+			self._childCache[label] = w
+			#self.api.register(w)
+		return self._childCache[label]
 
 	def getChildById(self, id):
-		w = CameraWidget()
-		self.api.checkedGP.gp_widget_get_child_by_id(self.c, id, PTR(w.c))
-		self.api.register(w)
-		return w
+		if id not in self._childCache:
+			w = CameraWidget(self.api)
+			self.api.checkedGP.gp_widget_get_child_by_id(self.c, id, PTR(w.c))
+			self._childCache[id] = w
+			#self.api.register(w)
+		return self._childCache[id]
 
 	def getChildByName(self, name):
-		w = CameraWidget()
-		# this fails in 2.4.6 (Ubuntu 9.10)
-		self.api.checkedGP.gp_widget_get_child_by_name(self.c, name, PTR(w.c))
-		self.api.register(w)
-		return w
+		if name not in self._childCache:
+			w = CameraWidget(self.api)
+			self.api.checkedGP.gp_widget_get_child_by_name(self.c, name, PTR(w.c))
+			self._childCache[name] = w
+			#self.api.register(w)
+		return self._childCache[name]
 
 	def __getitem__(self,k):
 		if k < self.countChildren():
@@ -703,21 +823,20 @@ class CameraWidget(object):
 		for i in range(self.countChildren()):
 			child = self.getChild(i)
 			children.append(child)
-			self.api.register(child)
 		return children
 	children = property(getChildren)
 
 	def getParent(self):
 		w = CameraWidget()
 		self.api.checkedGP.gp_widget_get_parent(self.c, PTR(w.c))
-		self.api.register(w)
+		#self.api.register(w)
 		return w
 	parent = property(getParent)
 
 	def getRoot(self):
 		w = CameraWidget()
 		self.api.checkedGP.gp_widget_get_root(self.c, PTR(w.c))
-		self.api.register(w)
+		#self.api.register(w)
 		return w
 	root = property(getRoot)
 
@@ -726,80 +845,43 @@ class CameraWidget(object):
 		float = ctypes.c_float
 		min, max, increment = range
 		self.api.checkedGP.gp_widget_set_range(self.c, float(min), float(max), float(increment))
-	def getRange(self, range):
+	def getRange(self):
 		"""cameraWidget.range => (min, max, increment)"""
 		min, max, increment = ctypes.c_float(), ctypes.c_float(), ctypes.c_float()
-		self.api.checkedGP.gp_widget_set_range(self._w, PTR(min), PTR(max), PTR(increment))
+		self.api.checkedGP.gp_widget_get_range(self.c, PTR(min), PTR(max), PTR(increment))
 		return (min.value, max.value, increment.value)
 	range = property(getRange,setRange)
 
 	def addChoice(self, choice):
 		self.api.checkedGP.gp_widget_add_choice(self.c,choice)
 
-	def countChoices(self, choice):
+	def countChoices(self):
 		return self.api.gp.gp_widget_count_choices(self.c)
 
 	def getChoice(self, choice_number):
 		choice = ctypes.c_char_p()
-		self.api.checkedGP.gp_widget_add_choice(self.c, choice_number, PTR(choice))
+		self.api.checkedGP.gp_widget_get_choice(self.c, choice_number, PTR(choice))
 		return choice.value
-
-	def createdoc(self):
-		label = "Label: " + self.label
-		info = "Info: " + (self.info if self.info != "" else "n/a")
-		type = "Type: " + self.typestr
-		#value = "Current value: " + str(self.value)
-		childs = []
-		for c in self.children:
-			childs.append("  - " + c.name + ": " + c.label)
-		if len(childs):
-			childstr = "Children:\n" + '\n'.join(childs)
-			return label + "\n" + info + "\n" + type + "\n" + childstr
-		else:
-			return label + "\n" + info + "\n" + type
-
-	def _pop(self, simplewidget):
-		widget = self
-		for c in widget.children:
-			simplechild = CameraWidgetSimple()
-			if c.countChildren():
-				setattr(simplewidget, c.name, simplechild)
-				simplechild.__doc__ = c.createdoc()
-				c._pop(simplechild)
-			else:
-				setattr(simplewidget, c.name, c)
-
-			#print c.name, simplewidget.__doc__
-		#print dir(simplewidget)
-
-	def populateChildren(self):
-		simplewidget = CameraWidgetSimple()
-		setattr(self, self.name, simplewidget)
-		simplewidget.__doc__ = self.createdoc()
-		self._pop(simplewidget)
+	
+	def getChoices(self):
+		out = []
+		for index in range(self.countChoices()):
+			out.append(self.getChoice(index))
+		return out
 
 	def __repr__(self):
-		return "%s:%s:%s:%s:%s" % (self.label, self.name, self.info, self.typestr, self.value)
+		return '<%s name=%s label=%s info=%s type=%s value=%s>'%(self.__class__.__name__, self.name, self.label, self.info, self.typeString, self.value)
 
 
 
 
 class CameraWidgetSimple(object):
 	pass
-
-
-
-
-if __name__ == '__main__':
-	print 'main'
-	api = API()
-	api.open('win32')
-	import time
-	cameras = api.getCameras()
-	for camera in cameras:
-		captured = camera.captureImage()
-		print captured
-		print 'data: %r'%captured.getData()[:10]
-		preview = camera.capturePreview()
-		print 'data p: %r'%preview.getData()[:10]
+class CameraWindow(CameraWidget):
+	def __init__(self,api,camera):
+		super(CameraWindow,self).__init__(api=api,type=GP_WIDGET_WINDOW)
+		self.camera = camera
+		
+	def writeToCamera(self):
+		self.camera.setConfig(self)
 

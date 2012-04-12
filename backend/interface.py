@@ -288,6 +288,8 @@ class Camera(object):
 
 class CameraProperty(object):
 	""" Generic interface for cameras """
+	section = 'General'
+	
 	@abstract
 	def getControlType(self):
 		""" 
@@ -317,7 +319,16 @@ class CameraProperty(object):
 		""" Return False if this value can be set """
 
 	def getCamera(self):
+		"""
+		Return the wrapper L{Camera} to which this property 
+		"""
 		return self.camera 
+	
+	def getSection(self):
+		"""
+		Return the name of a section (if controls are to be organised by sections/tabs) or None to put it in a default section
+		"""
+		return self.section
 
 
 class CameraValueProperty(CameraProperty):

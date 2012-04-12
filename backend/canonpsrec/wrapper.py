@@ -59,7 +59,6 @@ class Camera(interface.Camera):
 	
 	def open(self):
 		if self.opened:
-			print('reopen')
 			return
 		self.camera.startRemote()
 		self.properties = [i(camera=self) for i in self.api.propertyClasses]
@@ -133,7 +132,7 @@ class PSRECCameraValueProperty(interface.CameraValueProperty):
 			try:
 				self.sdkCamera[self.propertyId] = v
 			except:
-				print('failed to write %r to %s'%(v,self.propertyId))
+				print('failed to write camera property %r to %s'%(v,self.propertyId))
 				raise
 		
 	def rawToDisplay(self,rawValue):
@@ -219,51 +218,61 @@ class PSRECCameraButton(interface.CameraValueProperty):
 class Zoom(PSRECCameraValueProperty):
 	propertyId = 'ZOOM_POS'
 	name = 'Zoom'
+	section = 'Capture Settings'
 	controlType = interface.ControlType.Slider
 	
 class ISO(PSRECCameraValueProperty):
 	propertyId = 'ISO'
 	name = 'ISO'
+	section = 'Capture Settings'
 	controlType = interface.ControlType.Combo
 	
 class ExposureMode(PSRECCameraValueProperty):
 	propertyId = 'EXPOSURE_MODE'
 	name = 'Exposure mode'
+	section = 'Capture Settings'
 	controlType = interface.ControlType.Combo
 	
 class Aperture(PSRECCameraValueProperty):
 	propertyId = 'AV'
 	name = 'Aperture'
+	section = 'Capture Settings'
 	controlType = interface.ControlType.Combo
 
 class ShutterSpeed(PSRECCameraValueProperty):
 	propertyId = 'TV'
 	name = 'Shutter speed'
+	section = 'Capture Settings'
 	controlType = interface.ControlType.Combo
 
 class FocusPoint(PSRECCameraValueProperty):
 	propertyId = 'FOCUS_POINT_SETTING'
 	name = 'Focus point'
+	section = 'Capture Settings'
 	controlType = interface.ControlType.Combo
 	
 class WhiteBalance(PSRECCameraValueProperty):
 	propertyId = 'WB_SETTING'
 	name = 'White balance'
+	section = 'Capture Settings'
 	controlType = interface.ControlType.Combo
 	
 class CameraOutput(PSRECCameraValueProperty):
 	propertyId = 'CAMERA_OUTPUT'
 	name = 'Camera output'
+	section = 'Camera Settings'
 	controlType = interface.ControlType.Combo
 	
 class CameraModel(PSRECCameraValueProperty):
 	propertyId = 'CAMERA_MODEL_NAME'
 	name = 'Camera model'
+	section = 'Camera Settings'
 	controlType = interface.ControlType.Static
 	
 class ResetAEAFAWB(PSRECCameraButton):
 	propertyId = '_RESET_AE_AF_AWB'
 	name = 'Reset AE/AF/AWB'
+	section = 'Capture Settings'
 	controlType = interface.ControlType.Button
 	def go(self):
 		self.sdkCamera.reset_AE_AF_AWB(AE=True,AF=True,AWB=True)
@@ -271,6 +280,7 @@ class ResetAEAFAWB(PSRECCameraButton):
 class LockFocus(PSRECCameraButton):
 	propertyId = '_LOCK_FOCUS'
 	name = 'Lock focus'
+	section = 'Capture Settings'
 	controlType = interface.ControlType.Button
 	def go(self):
 		self.sdkCamera.lockFocus()
@@ -278,6 +288,7 @@ class LockFocus(PSRECCameraButton):
 class UnlockFocus(PSRECCameraButton):
 	propertyId = '_UNLOCK_FOCUS'
 	name = 'Unlock focus'
+	section = 'Capture Settings'
 	controlType = interface.ControlType.Button
 	def go(self):
 		self.sdkCamera.unlockFocus()
@@ -285,6 +296,7 @@ class UnlockFocus(PSRECCameraButton):
 class StartViewfinder(PSRECCameraButton):
 	propertyId = '_START_VIEWFINDER'
 	name = 'Start viewfinder'
+	section = 'Capture Settings'
 	controlType = interface.ControlType.Button
 	def go(self):
 		self.camera.startViewfinder()
@@ -293,6 +305,7 @@ class StartViewfinder(PSRECCameraButton):
 class StopViewfinder(PSRECCameraButton):
 	propertyId = '_STOP_VIEWFINDER'
 	name = 'Stop viewfinder'
+	section = 'Capture Settings'
 	controlType = interface.ControlType.Button
 	def go(self):
 		self.camera.stopViewfinder()

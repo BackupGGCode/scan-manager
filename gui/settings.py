@@ -318,19 +318,21 @@ class SetupWindow(BaseWidget,QtGui.QWidget):
 				self.app.settings = data
 				self.app.SetupWindow.saveSettings(data)
 				
-				progress.setValue(3)
+				i = 3
+				progress.setValue(i)
 				
 				for camera in self.app.cameras:
+					i += 3
+					progress.setValue(i)
 					camera.open()
 					camera.captureComplete.connect(self.app.MainWindow.captureCompleteCallback)
 					camera.viewfinderFrame.connect(self.app.MainWindow.viewfinderFrameCallback)
-	
-				progress.setValue(9)
+					
 				progress.close()
 				
+				self.app.SetupWindow.close()
 				self.app.MainWindow.startShooting()
 				self.app.MainWindow.show()
-				self.app.SetupWindow.close()
 			
 		
 	#

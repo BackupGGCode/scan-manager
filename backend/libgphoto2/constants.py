@@ -2,6 +2,19 @@
 # Based on: piggyphoto.py which is Copyright (C) 2010 Alex Dumitrache
 #
 
+class GPhotoError(Exception):
+    def __init__(self, result, message):
+        self.result = result
+        self.message = message
+    def __str__(self):
+        if self.message:
+            return '%s (%s)'%(self.message,self.result)
+        else:
+            return '(%s)'%(self.result)
+    def __repr__(self):
+        return '<%s %s (%s)>'%(self.__class__.__name__,self.message,self.result)
+    
+
 #cdef extern from "gphoto2/gphoto2-port-version.h":
 # ctypedef enum GPVersionVerbosity:
 GP_VERSION_SHORT = 0

@@ -5,13 +5,14 @@ import time
 import sys
 import os
 
+Pyro4.config.HMAC_KEY = "gphotoremote"
 
 class GPhotoClient(object):
 
 	startupTimeout = 5.0
 
 	def __init__(self):
-		pass
+		self.opened = False
 		
 	def open(self,basePath='',dllDir=None):
 		
@@ -42,16 +43,13 @@ class GPhotoClient(object):
 		self.api.open(dllDir=dllDir)
 
 	def close(self):
-		print 'client close'
 		if not self.opened:
 			return
 		
 		try: self.api.close()
 		except: pass
 			
-		try: 
-			self.api.stop()
-			print 'client close stop worked'
+		try: self.api.stop()
 		except: pass
 		
 		try: self.process.terminate()
@@ -64,11 +62,16 @@ class GPhotoClient(object):
 		except:
 			pass
 		
+		self.opened = False
+		
 	def __getattr__(self,k):
 		return getattr(self.api,k)
 	
 	def __del__(self):
-		self.close()
+		try:
+			self.close()
+		except:
+			pass
 
 if __name__ == '__main__':
 	client = GPhotoClient()

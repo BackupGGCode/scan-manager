@@ -48,27 +48,59 @@ class LiveView(BaseWidget,QtGui.QLabel):
 		
 
 
-class CameraControls(BaseWidget,QtGui.QFrame):
-	
-
-	class Layout(BaseLayout,QtGui.QFormLayout):
-		def init(self):
-			self._up.setLayout(self)
-
+class CameraControls(BaseWidget,QtGui.QTabWidget):
 
 	def setup(self,camera):
 		self.camera = camera
 		self.controls = []
+		self.tabs = {}
 		for property in camera.getProperties():
+			
+			section = property.getSection()
+			if section not in self.tabs:
+				tab = CameraControlsTab(self)
+				self.addTab(tab,section)
+				self.tabs[section] = tab
+				tab._up = self 
+				
+			tab = self.tabs[section]
 			cls = cameracontrols.controlTypeToClass[property.getControlType()]
-			control = cls(qtparent=self,cameraProperty=property)
+			control = cls(qtparent=tab.CameraControlsTabScroll.CameraControlsTabMainArea,cameraProperty=property)
 			self.controls.append(control)
-			control.fromCamera()
 
+		self.refreshFromCamera()
+		
+		for tab in self.tabs.values():
+			tab.CameraControlsTabScroll.CameraControlsTabMainArea.adjustSize()
 		
 	def refreshFromCamera(self):
 		for control in self.controls:
 			control.fromCamera()
+
+
+class CameraControlsTab(BaseWidget,QtGui.QWidget):
+	
+	class Layout(BaseLayout,QtGui.QVBoxLayout):
+		def init(self):
+			self._up.setLayout(self)
+			self.setSpacing(0)
+			self.setContentsMargins(0,0,0,0)
+			
+	class CameraControlsTabScroll(BaseWidget,QtGui.QScrollArea):
+		def init(self):
+			self._up.Layout.addWidget(self,1)
+			self.setContentsMargins(0,0,0,0)
+			
+		class CameraControlsTabMainArea(BaseWidget,QtGui.QWidget):
+			
+			class Layout(BaseLayout,QtGui.QFormLayout):
+				def init(self):
+					self._up.setLayout(self)
+		
+			def init(self):
+				self.setSizePolicy(QtGui.QSizePolicy.Ignored,QtGui.QSizePolicy.Ignored)
+				self._up.setWidget(self)
+
 
 
 
@@ -108,17 +140,16 @@ class MainWindow(BaseWidget,QtGui.QMainWindow):
 		self.app.imageManager = CapturedImageManager(path=self.app.settings.outputDirectory,view=self.app.Thumbnails,solo=solo)
 		progress = ProgressDialog(parent=self.app.MainWindow,text='Thumbnailing existing images',minimum=0,maximum=100)
 		
-		# the the image manager with any pre-existing images in the target directory 
+		# the the image manager with any pre-existing images in the target directory
 		progress.open()
 		self.app.imageManager.fillFromDirectory(progressCallback=lambda total,done: progress.setValue(int((float(done)/float(total))*100.0)))
 		progress.close()
-		
 		# for solo mode
 		if self.app.settings.mode != Mode.V:
 			self.app.Camera2Dock.hide()
 			self.app.Preview2.hide()
 		
-		# give controls for each camera a change to do their own initialisation (maily reading initial data from the camera)
+		# give controls for each camera a change to do their own initialisation (mainly reading initial data from the camera)
 		for ndx,camera in enumerate(self.app.cameras):
 			cc = getattr(self.app,'Camera%dControls'%(ndx+1))
 			cc.setup(camera)
@@ -126,7 +157,7 @@ class MainWindow(BaseWidget,QtGui.QMainWindow):
 		# hide the capture button if neither camera supports it			
 		if not (self.app.cameras[0].hasCapture() or self.app.cameras[0].hasCapture()):
 			self.app.CaptureButton.hide()
-				
+
 		
 	class ShootingView(BaseWidget,QtGui.QWidget):
 		def init(self):
@@ -248,6 +279,7 @@ class MainWindow(BaseWidget,QtGui.QMainWindow):
 				def onclicked(self):
 					captureThreads = []
 					for camera in self.app.cameras:
+						print 'starting capture thread' 
 						captureThreads.append(threading.Thread(target=camera.capture))
 					for thread in captureThreads:
 						thread.start()

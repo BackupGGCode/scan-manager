@@ -12,13 +12,7 @@ class AbstractCameraControl(object):
 	def __init__(self,qtparent,cameraProperty):
 		self.cameraProperty = cameraProperty
 		controlType = self.cameraProperty.getControlType()
-		self.field = self.Field(qtparent)
-		self.field.cameraControl = self
-		self.field._up = qtparent
-		toInit = self.field._autoInstantiate()
-		for o in toInit:
-			o.init()
-		self.field.init()
+		self.field = self.Field(qtparent,self)
 		if self.noLabel:
 			qtparent.Layout.addRow(self.field)
 		else:
@@ -49,16 +43,20 @@ class AbstractCameraControl(object):
 		Check the return value from setRawValue on the camera property and display an appropriate error if this value is invalid  
 		"""
 		if not rc:
-			self.field.app.cameraPropertiesChanged(self.cameraProperty.getCamera())
+			self.field._up._up._up.app.cameraPropertiesChanged(self.cameraProperty.getCamera())
 			return
 		else:
 			### TODO: do something with this error string
 			pass
 
+class CameraControlFieldWidget(BaseWidget):
+		def __init__(self,parent,cameraControl):
+			self.cameraControl = cameraControl
+			super(CameraControlFieldWidget,self).__init__(parent)
 
 class CameraSliderControl(AbstractCameraControl):
 
-	class Field(BaseWidget,QtGui.QSlider):
+	class Field(CameraControlFieldWidget,QtGui.QSlider):
 		def init(self):
 			self.setOrientation(Qt.Horizontal)
 		def onvalueChanged(self,raw):
@@ -70,7 +68,8 @@ class CameraSliderControl(AbstractCameraControl):
 		self.field.setSingleStep(self.cameraProperty.getStep())
 		self.field.setPageStep(self.cameraProperty.getStep())
 		raw = self.cameraProperty.getRawValue()
-		self.field.setSliderPosition(raw)
+		if raw is not None:
+			self.field.setSliderPosition(raw)
 
 	def toCamera(self):
 		raw = self.field.sliderPosition()
@@ -80,7 +79,7 @@ class CameraSliderControl(AbstractCameraControl):
 	
 class CameraStaticControl(AbstractCameraControl):
 
-	class Field(BaseWidget,QtGui.QLineEdit):
+	class Field(CameraControlFieldWidget,QtGui.QLineEdit):
 		def init(self):
 			self.setReadOnly(True)
 
@@ -96,9 +95,13 @@ class CameraStaticControl(AbstractCameraControl):
 		
 class CameraLineEditControl(AbstractCameraControl):
 
-	class Field(BaseWidget,QtGui.QLineEdit):
+	class Field(CameraControlFieldWidget,QtGui.QLineEdit):
+		def init(self):
+			if self.cameraControl.cameraProperty.isReadOnly():
+				self.setReadOnly(True)
 		def oneditingFinished(self):
-			self.cameraControl.toCamera()
+			if not self.cameraControl.cameraProperty.isReadOnly():
+				self.cameraControl.toCamera()
 
 	def fromCamera(self):
 		raw = self.cameraProperty.getRawValue()
@@ -114,7 +117,7 @@ class CameraLineEditControl(AbstractCameraControl):
 		
 class CameraComboControl(AbstractCameraControl):
 
-	class Field(BaseWidget,QtGui.QComboBox):
+	class Field(CameraControlFieldWidget,QtGui.QComboBox):
 		def onactivated(self,event):
 			self.cameraControl.toCamera()
 
@@ -136,7 +139,7 @@ class CameraCheckboxControl(AbstractCameraControl):
 	
 	noLabel = True
 	
-	class Field(BaseWidget,QtGui.QCheckBox):
+	class Field(CameraControlFieldWidget,QtGui.QCheckBox):
 		def init(self):
 			self.setText(self.cameraControl.cameraProperty.getName())
 		def onstateChanged(self,state):
@@ -145,27 +148,27 @@ class CameraCheckboxControl(AbstractCameraControl):
 	def fromCamera(self):
 		raw = self.cameraProperty.getRawValue()
 		if raw is None:
-			self.setCheckState(Qt.PartiallyChecked)
+			self.field.setCheckState(Qt.PartiallyChecked)
 		elif raw:
-			self.setCheckState(Qt.Checked)
+			self.field.setCheckState(Qt.Checked)
 		else:
-			self.setCheckState(Qt.Unchecked)
+			self.field.setCheckState(Qt.Unchecked)
 		
 	def toCamera(self):
 		state = self.field.checkState()
 		if state == Qt.PartiallyChecked:
-			self.processSetResult(self.camera.setRawValue(None))
+			self.processSetResult(self.cameraProperty.setRawValue(None))
 		elif state == Qt.Checked:
-			self.processSetResult(self.camera.setRawValue(True))
+			self.processSetResult(self.cameraProperty.setRawValue(True))
 		else:
-			self.processSetResult(self.camera.setRawValue(False))
+			self.processSetResult(self.cameraProperty.setRawValue(False))
 
 
 class CameraButtonControl(AbstractCameraControl):
 
 	noLabel = True
 	
-	class Field(BaseWidget,QtGui.QPushButton):
+	class Field(CameraControlFieldWidget,QtGui.QPushButton):
 		def init(self):
 			self.setText(self.cameraControl.cameraProperty.getName())
 		def onpressed(self):
