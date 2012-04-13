@@ -3,6 +3,9 @@ from .common import *
 from .dialogs import ProgressDialog
 import backend
 
+import base
+import log
+
 
 class FormData(BaseSettings):
 	pass
@@ -417,7 +420,7 @@ class SetupWindow(BaseWidget,QtGui.QWidget):
 				errors.append(self.tr('No left-hand camera selected'))
 			if not data.cameraR:
 				errors.append(self.tr('No right-hand camera selected'))
-			if data.cameraL and data.cameraR and data.cameraL == data.cameraR:
+			if data.cameraL and data.cameraR and (data.cameraL == data.cameraR):
 				errors.append(self.tr('You must select different cameras for left and right (chose the left-right mode if you want to alternate one camera)'))
 		else:
 			if not data.cameraC:

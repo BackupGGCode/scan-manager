@@ -24,6 +24,10 @@ class API(interface.API):
 	
 	def getName(self):
 		return 'Canon PS-ReC (for older PowerShot cameras)'
+	
+		
+	def getId(self):
+		return 'canonpsrec'
 		
 		
 	def getCameras(self):

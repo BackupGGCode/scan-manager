@@ -2,7 +2,7 @@ from .common import *
 from . import shooting
 from . import settings
 import backend
-from log import *
+import base
 
 import shelve
 import sys
@@ -15,9 +15,11 @@ class App(Application):
 		self.db = shelve.open(os.path.join(smDataPath(),'scanmanager.settings'))
 		self.images = []
 
-		backend.apis.loadAll()		
-		backend.apis.openAll(db=self.db)
-		errorText = backend.apis.formatAPIErrors()
+		backend.apis = backend.BackendManager(trace=base.runtimeOptions.trace)
+		apis = backend.apis
+		apis.loadAll()		
+		apis.openAll(db=self.db)
+		errorText = apis.formatAPIErrors()
 		if errorText:
 			sys.stderr.write(errorText)
 		

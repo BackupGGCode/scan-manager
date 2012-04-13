@@ -142,11 +142,11 @@ class CameraCheckboxControl(AbstractCameraControl):
 	class Field(CameraControlFieldWidget,QtGui.QCheckBox):
 		def init(self):
 			self.setText(self.cameraControl.cameraProperty.getName())
-		def onstateChanged(self,state):
+		def onclicked(self):
 			self.cameraControl.toCamera()
 			
 	def fromCamera(self):
-		raw = self.cameraProperty.getRawValue()
+		raw = self.cameraProperty.rawToDisplay(self.cameraProperty.getRawValue())
 		if raw is None:
 			self.field.setCheckState(Qt.PartiallyChecked)
 		elif raw:
@@ -157,11 +157,11 @@ class CameraCheckboxControl(AbstractCameraControl):
 	def toCamera(self):
 		state = self.field.checkState()
 		if state == Qt.PartiallyChecked:
-			self.processSetResult(self.cameraProperty.setRawValue(None))
+			self.processSetResult(self.cameraProperty.setRawValue(self.cameraProperty.displayToRaw(None)))
 		elif state == Qt.Checked:
-			self.processSetResult(self.cameraProperty.setRawValue(True))
+			self.processSetResult(self.cameraProperty.setRawValue(self.cameraProperty.displayToRaw(True)))
 		else:
-			self.processSetResult(self.cameraProperty.setRawValue(False))
+			self.processSetResult(self.cameraProperty.setRawValue(self.cameraProperty.displayToRaw(False)))
 
 
 class CameraButtonControl(AbstractCameraControl):

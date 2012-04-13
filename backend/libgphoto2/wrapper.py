@@ -12,6 +12,7 @@ import platform
 import time
 import threading
 import constants
+import log
 
 
 class API(interface.API):
@@ -28,9 +29,13 @@ class API(interface.API):
 	
 	
 	def getName(self):
+		return 'GPhoto (libgphoto2)'
+		
+		
+	def getId(self):
 		return 'libgphoto2'
 		
-		
+	
 	def open(self):
 		
 		if self.opened:
@@ -49,6 +54,8 @@ class API(interface.API):
 		
 
 	def getCameras(self):
+		if self.cameras:
+			return self.cameras
 		out = []
 		apiCameras = self.api.getCameras()
 		for apiCamera in apiCameras:
@@ -170,14 +177,12 @@ class Camera(interface.Camera):
 			try:
 				self.camera.setConfiguration(self.config)
 			except:
-				print 'Failed setting camera properties %s'%s
+				log.logException('Failed setting camera properties %s'%s,log.WARNING)
 			else:
-				print 'Succeeded in setting camera properties %s'%s
+				log.debug('Successfully changed camera properties %s'%s)
 				
 			for i in toClear:
 				i['changed'] = False
-		else:
-			print 'nothing to set'
 			
 				
 	def configurationFromCamera(self):
@@ -192,8 +197,9 @@ class Camera(interface.Camera):
 				if (widget['name'] in old) and (widget['value'] != old[widget['name']]['value']):
 					changed.append(widget)
 		
-		changedString = ','.join(['%s=%r'%(i['label'],i['value']) for i in changed])
-		print 'CHANGED',changedString
+		if changed:
+			changedString = ','.join(['%s=%r'%(i['label'],i['value']) for i in changed])
+			log.debug('Camera values changed %s'%changedString)
 		
 		return changed
 	
@@ -267,18 +273,34 @@ class GPhotoCameraValueProperty(interface.CameraValueProperty):
 	
 	def setRawValue(self,v):
 		if self.widget['value'] != v:
-			print 'set raw changed',v
 			self.widget['value'] = v
 			self.widget['changed'] = True
 			self.camera.configurationToCamera()
 			self.camera.configurationFromCamera()
-		else:
-			print 'set raw no change',v
 		
 	def rawToDisplay(self,rawValue):
-		return rawValue
+		if self.widget['type'] == constants.GP_WIDGET_TOGGLE:
+			if rawValue == 0:
+				return None
+			elif rawValue == 1:
+				return True
+			elif rawValue == 2:
+				return True
+			else:
+				log.warn('Unsupported raw value %r for camera toggle control %s'%(rawValue,self.getName()))
+		else:
+			return rawValue
 		
 	def displayToRaw(self,displayValue):
+		if self.widget['type'] == constants.GP_WIDGET_TOGGLE:
+			if displayValue is None:
+				return None
+			elif displayValue is False:
+				return 0
+			elif displayValue is True:
+				return 1
+			else:
+				log.warn('Unsupported display value %r for camera toggle control %s'%(displayValue,self.getName()))
 		return displayValue
 		
 	def getMin(self):

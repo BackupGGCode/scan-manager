@@ -39,6 +39,10 @@ class API(interface.API):
 		return 'Windows Image Acquisition (WIA)'
 		
 		
+	def getId(self):
+		return 'wia'
+		
+		
 	def getCameras(self):
 		return self.cameras
 

@@ -168,7 +168,7 @@ class API(object):
 
 
 	def log(self,text):
-		print 'APILOG',text
+		print 'libgphoto API WARNING:',text
 
 
 	def traceDLLCallStart(self,function,args,kargs):
@@ -176,6 +176,7 @@ class API(object):
 		sArgs += ['%s=%r'%(k,v) for k,v in kargs.items()]
 		s = '%s(%s)'%(function.__name__,','.join(sArgs))
 		print s
+		
 		
 	def traceDLLCallEnd(self,function,args,kargs,result):
 		sArgs = ['%r'%i for i in args]
@@ -530,10 +531,7 @@ class Camera(object):
 		def widgetToDict(widget):
 			type = widget.getType()
 			readonly = widget.getReadonly()
-			if not readonly:
-				value = widget.getValue()
-			else:
-				value = None
+			value = widget.getValue()
 			out = dict(
 				id = widget.getId(),
 				name = widget.getName(),
@@ -567,8 +565,8 @@ class Camera(object):
 			for widget in section['children']:
 				if widget['changed']:
 					if not realSection:
-						realSection = realWindow.getChildById(section['id'])
-					realWidget = realSection.getChildById(widget['id'])
+						realSection = realWindow.getChildByName(section['name'])
+					realWidget = realSection.getChildByName(widget['name'])
 					realWidget.setValue(widget['value'])
 		self.setConfig(realWindow)
 					
@@ -724,21 +722,24 @@ class CameraWidget(object):
 	label = property(getLabel,setLabel)
 
 	def getValue(self):
-		if self.type in (GP_WIDGET_WINDOW,GP_WIDGET_SECTION,GP_WIDGET_RANGE):
+		if self.type in (GP_WIDGET_WINDOW,GP_WIDGET_SECTION):
 			return None
 		value = ctypes.c_void_p()
 		rc = self.api.checkedGP.gp_widget_get_value(self.c, PTR(value))
 		if self.type in (GP_WIDGET_MENU, GP_WIDGET_RADIO, GP_WIDGET_TEXT):
-			value = ctypes.cast(value.value, ctypes.c_char_p)
+			value = ctypes.cast(value, ctypes.c_char_p)
 			value = value.value
 		elif self.type == GP_WIDGET_RANGE:
 			if value.value is None:
-				return None
-			value = ctypes.cast(value, ctypes.POINTER(ctypes.c_float))
-			value = value.contents.value
-		elif self.type in (GP_WIDGET_TOGGLE, GP_WIDGET_DATE):
-			#value = ctypes.cast(value.value, ctypes.POINTER(ctypes.c_int))
-			return
+				value = None
+			else:
+				value = ctypes.cast(ctypes.pointer(value), ctypes.POINTER(ctypes.c_float))
+				value = value.contents.value
+		elif self.type in (GP_WIDGET_TOGGLE,GP_WIDGET_DATE):
+			if value.value is None:
+				value = 0
+			else:
+				value = value.value
 		elif self.type == GP_WIDGET_BUTTON:
 			raise Exception('Getting a value for a GP_WIDGET_BUTTON should return a CameraWidgetCallback but we haven\'t built that yet')
 		else:
@@ -754,7 +755,7 @@ class CameraWidget(object):
 			v = ctypes.c_char_p(value)
 		elif self.type == GP_WIDGET_RANGE:
 			v = PTR(ctypes.c_float(float(value)))
-		elif self.type in (GP_WIDGET_TOGGLE, GP_WIDGET_DATE):
+		elif self.type in (GP_WIDGET_TOGGLE,GP_WIDGET_DATE):
 			v = PTR(ctypes.c_int(int(value)))
 		elif self.type == GP_WIDGET_BUTTON:
 			v = structures.CameraWidgetCallback(

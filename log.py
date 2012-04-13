@@ -8,6 +8,7 @@ import logging
 import logging.handlers
 from logging import CRITICAL,ERROR,WARNING,INFO,DEBUG
 import os
+import types
 from base import smDataPath
 
 __all__ = ['configureLogging','log','logException','debug','info','warning','warn','error','critical','exception','CRITICAL','ERROR','WARNING','INFO','DEBUG']
@@ -16,7 +17,7 @@ __all__ = ['configureLogging','log','logException','debug','info','warning','war
 # Setup Python logging based on configuration options
 #
 
-def configureLogging():
+def configureLogging(fileLevel=DEBUG,screenLevel=WARNING):
 	""" 
 	Set up logging based on configuration options 
 	
@@ -36,14 +37,13 @@ def configureLogging():
 		backupCount=10,
 	)
 	handler.setLevel(DEBUG)
-	formatter = logging.Formatter('%(asctime)s %(levelname)-8s [scanmanager] %(message)s')
+	formatter = logging.Formatter('%(asctime)s %(levelname)-8s %(message)s')
 	handler.setFormatter(formatter)
 	logger.addHandler(handler)
-	logger.setLevel(logging.NOTSET)
 	
 	console = logging.StreamHandler()
-	console.setLevel(WARNING)
-	formatter = logging.Formatter('%(asctime)s %(levelname)-8s [scanmanager] %(message)s')
+	console.setLevel(DEBUG)
+	formatter = logging.Formatter('%(asctime)s %(levelname)-8s %(message)s')
 	console.setFormatter(formatter)
 	logger.addHandler(console)
 
@@ -95,4 +95,71 @@ def critical(*args,**kargs):
 def exception(*args,**kargs):
 	logger.exception(*args,**kargs)
 	
+	
 
+class TracedCallable(object):
+	
+	def __init__(self,parent,f,callbackStart=None,callbackEnd=None):
+		self.parent = parent
+		self.f = f
+		self.callbackStart = callbackStart
+		self.callbackEnd = callbackEnd
+	
+	def __call__(self,*args,**kargs):
+		if self.callbackStart:
+			self.callbackStart(self.parent,self.f,args,kargs)
+		result = self.f(*args,**kargs)
+		if self.callbackEnd:
+			self.callbackEnd(self.parent,self.f,args,kargs,result)
+		return result
+	
+
+class TracingWrapper(object):
+	"""
+	Wrap an object so that its method invocations are traced 
+	"""
+	
+	def __init__(self,parent,prefix='',callbackStart=None,callbackEnd=None):
+		self.__dict__['parent'] = parent
+		self.__dict__['callbackStart'] = callbackStart or self.traceStart
+		self.__dict__['callbackEnd'] = callbackEnd or self.traceEnd
+		self.__dict__['prefix'] = 'trace'
+		
+	def __getattr__(self,k):
+		v = getattr(self.parent,k)
+		if type(v) is types.MethodType:
+			return TracedCallable(self.parent,v,self.callbackStart,self.callbackEnd)
+		else:
+			return v
+	def __setattr__(self,k,v):
+		return setattr(self.parent,k,v)
+	def __hasattr(self,k):
+		return k in self.__dict__ or hasattr(self.parent,k)
+		
+
+	def traceStart(self,parent,function,args,kargs):
+		if hasattr(parent,'getId'):
+			name = parent.getId()
+		elif hasattr(parent,'getName'):
+			name = parent.getName()
+		else:
+			name = parent.__class__.__name__
+		sArgs = ['%r'%i for i in args]
+		sArgs += ['%s=%r'%(k,v) for k,v in kargs.items()]
+		s = '[%s] %s.%s(%s)'%(self.prefix,name,function.__name__,','.join(sArgs))
+		debug(s)
+		
+		
+	def traceEnd(self,parent,function,args,kargs,result):
+		if hasattr(parent,'getId'):
+			name = parent.getId()
+		elif hasattr(parent,'getName'):
+			name = parent.getName()
+		else:
+			name = parent.__class__.__name__
+		sArgs = ['%r'%i for i in args]
+		sArgs += ['%s=%r'%(k,v) for k,v in kargs.items()]
+		s = '[%s] %s.%s(%s) -> %r'%(self.prefix,name,function.__name__,','.join(sArgs),result)
+		debug(s)
+
+		

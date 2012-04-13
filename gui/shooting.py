@@ -278,11 +278,11 @@ class MainWindow(BaseWidget,QtGui.QMainWindow):
 					
 				def onclicked(self):
 					captureThreads = []
-					for camera in self.app.cameras:
-						print 'starting capture thread' 
+					for camera in reversed(self.app.cameras):
 						captureThreads.append(threading.Thread(target=camera.capture))
 					for thread in captureThreads:
 						thread.start()
+						print 'starting capture thread'
 			
 					
 					

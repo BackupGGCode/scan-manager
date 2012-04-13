@@ -40,6 +40,7 @@ class Enum(object):
 			raise KeyError(i)
 
 
+
 class BaseSettings(object):
 	def __init__(self,**kargs):
 		self.__dict__.update(kargs)
@@ -117,3 +118,10 @@ def smDataPath():
 	if not os.path.exists(target):
 		os.makedirs(target)
 	return target
+
+
+class runtimeOptions(object):
+	"""
+	Just a container to hold runtime options shared across the system
+	"""
+	debug = False #: run in trace/debug mode

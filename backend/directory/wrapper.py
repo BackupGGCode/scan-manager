@@ -23,7 +23,11 @@ class API(interface.API):
 	
 	def getName(self):
 		return 'Dummy (simply scans a directory for new files)'
+
 	
+	def getId(self):
+		return 'directory'
+		
 	
 	def getCameras(self):
 		return self.cameras

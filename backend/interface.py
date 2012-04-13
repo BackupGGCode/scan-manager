@@ -81,6 +81,15 @@ class API(object):
 		"""
 
 		
+	@abstract
+	def getId(self):
+		"""
+		Return the display a short identifier for this API
+		
+		@return: str
+		"""
+
+		
 	@abstract	
 	def getCameras(self):
 		"""
