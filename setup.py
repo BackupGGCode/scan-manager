@@ -7,13 +7,23 @@ if platform.system().lower() == 'windows':
 	
 	setup(
 		name = "scanmanager",
-		version = "0.1",
+		version = "0.2",
 		description = "Tethered shooting GUI for book scanners",
 		data_files = [
 			# Canon PS-ReC dlls
 			('backend/canonpsrec',['backend/canonpsrec/PRLIB.dll','backend/canonpsrec/PRSDK.dll']),
 			# Nikon DLLs and plugins
 			('backend/nikonsdk',['backend/nikonsdk/NkdPTP.dll','backend/nikonsdk/NkdPTPDi.dll','backend/nikonsdk/D80_Mod.md3']),
+            # libgphoto2 backend dlls etc.
+            ('backend/libgphoto2',glob('backend/libgphoto2/*.py')),
+            ('backend/libgphoto2/remote',glob('backend/libgphoto2/remote/*.py')),
+            ('backend/libgphoto2/remote/bin',glob('backend/libgphoto2/remote/bin/*')),
+            ('backend/libgphoto2/win32',glob('backend/libgphoto2/win32/*.dll')),
+            ('backend/libgphoto2/win32',glob('backend/libgphoto2/win32/*.exe')),
+            ('backend/libgphoto2/win32',glob('backend/libgphoto2/win32/*.bat')),
+            ('backend/libgphoto2/win32',glob('backend/libgphoto2/win32/*.txt')),
+            ('backend/libgphoto2/win32/camlibs',glob('backend/libgphoto2/win32/camlibs/*.dll')),
+            ('backend/libgphoto2/win32/iolibs',glob('backend/libgphoto2/win32/iolibs/*.dll')),
 			# Image format plugins for PyQt4
 			('imageformats',glob('d:\Python27\Lib\site-packages\PySide\plugins\imageformats\*')),
 			#glob('d:\Python27\Lib\site-packages\PySide\qt.conf'),
@@ -24,7 +34,7 @@ if platform.system().lower() == 'windows':
 						includes = ['PySide.QtNetwork','dumbdbm','dbhash'],
 			),
 		),
-		#console = ('scanmanager.py',),
+		console = ('scanmanager.py',),
 		windows = [
 	       dict(
 				script = 'scanmanager.py',

@@ -5,7 +5,7 @@ pause
 cd ..
 %PYTHON_ROOT%\python setup.py py2exe
 pause
-cd dist
-"D:\Program Files (x86)\NSIS\makensis.exe" /NOCD ..\scanmanager.nsi
-cd ..
+%PYTHON_ROOT%\python makensi.py
+pause
+"D:\Program Files (x86)\NSIS\makensis.exe" /NOCD scanmanager.nsi
 pause

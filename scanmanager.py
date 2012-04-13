@@ -52,7 +52,7 @@ if __name__ == '__main__':
 		else:
 			log.configureLogging(fileLevel=log.DEBUG,screenLevel=log.WARNING)
 			
-		log.info('starting up')
+		log.debug('starting up')
 		
 		app = App(sys.argv)
 		sys.excepthook = excepthook

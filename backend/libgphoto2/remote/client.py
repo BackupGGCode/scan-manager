@@ -32,8 +32,11 @@ class GPhotoClient(object):
 		self.opened = True
 		atexit.register(self.close)
 		si = subprocess.STARTUPINFO()
+		si.dwFlags = subprocess.STARTF_USESHOWWINDOW
+		si.wShowWindow = subprocess.SW_HIDE
 		self.process = subprocess.Popen(
 			(os.path.join(basePath,'remote','bin','gphotoremote.exe'),os.path.join(basePath,'remote','server.py'),basePath),
+			startupinfo = si
 		)
 
 		start = time.time()
@@ -75,7 +78,10 @@ class GPhotoClient(object):
 		
 		
 	def __getattr__(self,k):
-		return getattr(self.api,k)
+		if 'api' in self.__dict__:
+			return getattr(self.api,k)
+		else:
+			raise AttributeError(k)
 	
 	
 	def __del__(self):
