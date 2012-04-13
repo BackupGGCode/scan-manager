@@ -29,6 +29,7 @@ def configureLogging(fileLevel=DEBUG,screenLevel=WARNING):
 		raise Exception('Logging has already been configured')
 	
 	logger = logging.getLogger('scanmanager')
+	logger.propagate = False
 	
 	handler = logging.handlers.RotatingFileHandler(
 		filename=os.path.join(smDataPath(),'scanmanager.log'),
@@ -41,11 +42,12 @@ def configureLogging(fileLevel=DEBUG,screenLevel=WARNING):
 	handler.setFormatter(formatter)
 	logger.addHandler(handler)
 	
-	console = logging.StreamHandler()
-	console.setLevel(DEBUG)
-	formatter = logging.Formatter('%(asctime)s %(levelname)-8s %(message)s')
-	console.setFormatter(formatter)
-	logger.addHandler(console)
+	if screenLevel is not None:
+		console = logging.StreamHandler()
+		console.setLevel(DEBUG)
+		formatter = logging.Formatter('%(asctime)s %(levelname)-8s %(message)s')
+		console.setFormatter(formatter)
+		logger.addHandler(console)
 
 	logger.setLevel(-1)
 

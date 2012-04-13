@@ -13,8 +13,8 @@ import resources
 
 
 COMMAND_LINE_HELP = """Usage: scanmanager [--debug]
-    -d, --debug			Run in debug mode (logs detailed information to the console as well as the log file) 
-    -t, --trace         Log detailed calls for debugging backend APIs 
+	-d, --debug			Run in debug mode (logs detailed information to the console as well as the log file) 
+	-t, --trace		 Log detailed calls for debugging backend APIs 
 """
 
 def excepthook(excType, excValue, tracebackobj):
@@ -33,7 +33,7 @@ def excepthook(excType, excValue, tracebackobj):
 
 
 if __name__ == '__main__':
-	
+
 	class MyOptParser(optparse.OptionParser):
 		def print_help(self):
 			print 'ScanManager'
@@ -45,6 +45,16 @@ if __name__ == '__main__':
 	
 	base.runtimeOptions.debug = options.debug
 	base.runtimeOptions.trace = options.trace
+
+	if getattr(sys,'frozen',None) == 'windows_exe':
+		class Blackhole(object):
+			softspace = 0
+			def write(self, text):
+				pass
+			def flush(self):
+				pass
+		sys.stdout = Blackhole()
+		sys.stderr = Blackhole()
 
 	try:
 		if base.runtimeOptions.debug:

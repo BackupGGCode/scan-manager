@@ -91,8 +91,10 @@ def l(path,recurse=True):
             deleteDirs += '    RMDir "%s"\n'%os.path.join('$INSTDIR',part)
         elif base:
             create += '    File "/oname=%s" "%s"\n'%(part,full)
+            delete += '    Delete "%s"\n'%os.path.join('$INSTDIR',part)
         else:
             create += '    File "%s"\n'%(part)
+            delete += '    Delete "%s"\n'%os.path.join('$INSTDIR',part)
             
         if f.isdir and recurse:
             l(f.path)
