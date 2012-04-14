@@ -1,6 +1,7 @@
 from .common import *
 from . import shooting
 from . import settings
+from . import calibrate
 import backend
 import base
 
@@ -23,6 +24,11 @@ class App(Application):
 		if errorText:
 			sys.stderr.write(errorText)
 		
+		if 'calibrators' in self.db:
+			self.calibrators = self.db['calibrators']
+		else:
+			self.calibrators = [None,None]
+		
 		self.setWindowIcon(QtGui.QIcon(':/scanmanager-16.png'))
 		self.SetupWindow.initialiseOptions()
 		self.SetupWindow.show()
@@ -35,7 +41,7 @@ class App(Application):
 
 	class MainWindow(shooting.MainWindow):
 		pass
-
+	
 	
 	class Timer(BaseWidget,QtCore.QTimer):
 		
@@ -65,3 +71,5 @@ class App(Application):
 		else:
 			return (self.settings.cameraC,)
 
+	calibrationDataChanged = QtCore.Signal()
+	

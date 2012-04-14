@@ -3,8 +3,156 @@ from PySide.QtCore import Qt
 from pysideline import *
 import math
 
+#
+# Start Crop Stuff
+#
+linePen = QtGui.QPen(QtGui.QColor(133,133,255),1.0,Qt.DotLine,Qt.RoundCap,Qt.RoundJoin)
+handleBrush = QtGui.QBrush(QtGui.QColor(133,133,255))
+
+class CropHandle(QtGui.QGraphicsRectItem):
+	def __init__(self,cropBox):
+		QtGui.QGraphicsRectItem.__init__(self)
+		self.cropBox = cropBox
+		self.lines = [] 
+		self.setBrush(handleBrush)
+		self.setRect(0.0,0.0,8.0,8.0)
+		self.setZValue(100)
+		self.setFlags(Qt.ItemIsSelectable|QtGui.QGraphicsItem.ItemIsMovable|QtGui.QGraphicsItem.ItemIsFocusable|QtGui.QGraphicsItem.ItemSendsGeometryChanges|QtGui.QGraphicsItem.ItemIgnoresTransformations)
+
+	def registerLine(self,line):
+		self.lines.append(line)
+
+	def itemChange(self,change,value):
+		if change == self.ItemPositionChange:
+			if value.x() < -(self.size/2.0):
+				value.setX(-(self.size/2.0))
+			elif value.y() < -(self.size/2.0):
+				value.setY(-(self.size/2.0))
+		
+		if change == self.ItemPositionHasChanged:
+			pos = self.scenePos()
+			if self is self.cropBox.tl:
+				self.cropBox.bl.setX(pos.x())
+				self.cropBox.tr.setY(pos.y())
+			elif self is self.cropBox.tr:
+				self.cropBox.br.setX(pos.x())
+				self.cropBox.tl.setY(pos.y())
+			elif self is self.cropBox.bl:
+				self.cropBox.br.setY(pos.y())
+				self.cropBox.tl.setX(pos.x())
+			elif self is self.cropBox.br:
+				self.cropBox.bl.setY(pos.y())
+				self.cropBox.tr.setX(pos.x())
+			for line in self.lines:
+				line.handleMoved(self,self.getCenterPos())
+		
+		return QtGui.QGraphicsRectItem.itemChange(self,change,value)
+	
+	def getCenterPos(self):
+		pos = self.scenePos()
+		pos.setX(pos.x()+(self.size/2.0))
+		pos.setY(pos.y()+(self.size/2.0))
+		return pos
+
+	def setCenterPos(self,pos):
+		pos = QtCore.QPointF(pos)
+		pos.setX(pos.x()-(self.size/2.0))
+		pos.setY(pos.y()-(self.size/2.0))
+		self.setPos(pos)
+
+	def setX(self,x):
+		pos = self.scenePos()
+		pos.setX(x)
+		self.setPos(pos)
+		
+	def setY(self,y):
+		pos = self.scenePos()
+		pos.setY(y)
+		self.setPos(pos)
+
+
+	@property
+	def size(self):
+		return self.cropBox.view.transform().inverted()[0].mapRect(self.rect()).width()
+	
+	
+class CropLine(QtGui.QGraphicsLineItem):
+	def __init__(self,cropBox,handle1,handle2):
+		QtGui.QGraphicsLineItem.__init__(self)
+		self.cropBox = cropBox
+		self.handle1 = handle1
+		self.handle2 = handle2
+		self.handle1.lines.append(self)
+		self.handle2.lines.append(self)
+		self.setPen(linePen)
+		self.setZValue(100)
+		self.setFlags(QtGui.QGraphicsItem.ItemIgnoresTransformations)
+		
+	def handleMoved(self,handle,position):
+		position = self.cropBox.view.transform().map(position)
+		line = self.line()
+		p1 = line.p1()
+		p2 = line.p2()
+		if handle is self.handle1:
+			l = QtCore.QLineF(position,p2)
+			self.setLine(QtCore.QLineF(position,p2))
+		elif handle is self.handle2:
+			l = QtCore.QLineF(p1,position)
+			self.setLine(QtCore.QLineF(p1,position))
+		else:
+			raise Exception('unknown handle %s'%handle)
+	
+
+class CropBox(object):
+	def __init__(self,view,scene):
+		self.view = view
+		self.scene = scene
+		self.tl = CropHandle(self)
+		self.tr = CropHandle(self)
+		self.bl = CropHandle(self)
+		self.br = CropHandle(self)
+		self.handles = [self.tl,self.tr,self.bl,self.br]
+		self.top = CropLine(self,self.tl,self.tr)
+		self.left = CropLine(self,self.tl,self.bl)
+		self.right = CropLine(self,self.tr,self.br)
+		self.bottom = CropLine(self,self.bl,self.br)
+		self.lines = [self.top,self.left,self.right,self.bottom]
+		scene.addItem(self.tl)
+		scene.addItem(self.tr)
+		scene.addItem(self.bl)
+		scene.addItem(self.br)
+		scene.addItem(self.top)
+		scene.addItem(self.left)
+		scene.addItem(self.right)
+		scene.addItem(self.bottom)
+		
+	def hide(self):
+		for i in self.lines + self.handles:
+			i.hide()
+		
+	def show(self):
+		for i in self.lines + self.handles:
+			i.show()
+		
+	def setRect(self,rect):
+		self.tl.setCenterPos(rect.topLeft())
+		self.tr.setCenterPos(rect.topRight())
+		self.bl.setCenterPos(rect.bottomLeft())
+		self.br.setCenterPos(rect.bottomRight())
+		self.recalc()
+		
+	def recalc(self):
+		for line in self.lines:
+			line.handleMoved(line.handle1,line.handle1.getCenterPos())
+			line.handleMoved(line.handle2,line.handle2.getCenterPos())
+		self.scene.setSceneRect(self.scene.itemsBoundingRect())
+#
+# Start image viewer stuff
+#		
+
 MIN_SCALE = 0.05
 MAX_SCALE = 2.00
+
 
 class ImageViewer(BaseWidget,QtGui.QWidget):
 	
@@ -22,22 +170,32 @@ class ImageViewer(BaseWidget,QtGui.QWidget):
 			self._up.setLayout(self)
 			self.setSpacing(0)
 			self.setContentsMargins(0,0,0,0)
-			self.addWidget(self._up.ScrollArea,1)
+			self.addWidget(self._up.ImageView,1)
 			self.addWidget(self._up.Toolbar,0)
 		
-	class ScrollArea(BaseWidget,QtGui.QScrollArea):
+	class ImageView(BaseWidget,QtGui.QGraphicsView):
 		def init(self):
-			self.setBackgroundRole(QtGui.QPalette.Dark)
-			self.setContentsMargins(0,0,0,0)
+			self._scene = QtGui.QGraphicsScene()
+			self.setScene(self._scene)
+			self.setBackgroundRole(QtGui.QPalette.Base)
+			self._item = None
+
+			# crop box set up
+			self._up.cropBox = CropBox(self,self._scene)
+			self._up.cropBox.setRect(QtCore.QRectF(0,0,100.0,100.0))
+			self._up.cropBox.hide()
 			
-		class ImageLabel(BaseWidget,QtGui.QLabel):
-			def init(self):
-				self.setBackgroundRole(QtGui.QPalette.Base)
-				self.setSizePolicy(QtGui.QSizePolicy.Ignored,QtGui.QSizePolicy.Ignored)
-				self.setScaledContents(True)
-				self._up.setWidget(self)
-				self.resize(0,0)
-				
+		def setPixmap(self,pm):
+			if self._item:
+				self._scene.removeItem(self._item)
+			self._item = self._scene.addPixmap(pm)
+			self._item.setZValue(10)
+			
+		def setTransform(self,transform):
+			QtGui.QGraphicsView.setTransform(self,transform)
+			# crop box (allow it to rescale lines) 
+			self._up.cropBox.recalc()
+			
 		
 	def load(self,image):
 		self._pm.load(image)
@@ -50,52 +208,57 @@ class ImageViewer(BaseWidget,QtGui.QWidget):
 		else:
 			self._pm.loadFromData(data)
 			
-		self.ScrollArea.ImageLabel.setPixmap(self._pm)
+		self.ImageView.setPixmap(self._pm)
 		
 		if self.fitToWindowAct.isChecked():
 			self.fitToWindow()
 			self.updateActions()
-			self.updateSlider()
 		else:
-			self.ScrollArea.ImageLabel.adjustSize()
+			self.rescale()
 			self.updateActions()
 			self.updateSlider()
-
+			
 
 	def zoomIn(self):
 		self.scaleImage(1.25)
-		self.updateSlider()
 
 
 	def zoomOut(self):
 		self.scaleImage(0.8)
-		self.updateSlider()
 
 
 	def normalSize(self):
-		self.ScrollArea.ImageLabel.adjustSize()
 		self.scaleFactor = 1.0
+		self.rescale()
 		self.updateSlider()
 
 
 	def fitToWindow(self):
-		if not self.ScrollArea.ImageLabel.pixmap():
+		if not self.ImageView._item:
 			return
 		if not self.fitToWindowAct.isChecked():
 			self.fitToWindowAct.setChecked(True)
-		scaledSize = self.ScrollArea.ImageLabel.pixmap().size()
-		scaledSize.scale(self.ScrollArea.contentsRect().size(), Qt.KeepAspectRatio)
-		self.ScrollArea.ImageLabel.resize(scaledSize)
-		self.scaleFactor = float(self.ScrollArea.ImageLabel.size().width()) / float(self.ScrollArea.ImageLabel.pixmap().size().width())
+		scaledSize = self._pm.size()
+		scaledSize.scale(self.ImageView.contentsRect().size(), Qt.KeepAspectRatio)
+		self.scaleFactor = (float(scaledSize.width()) / float(self._pm.size().width())) - 0.001
+		self.rescale()
 		self.updateSlider()
+
+
+	def rescale(self):
+		transform = QtGui.QTransform()
+		transform.scale(self.scaleFactor,self.scaleFactor)
+		self.ImageView.setTransform(transform)
 		
+		
+	def scaleImage(self, factor):
+		self.scaleFactor *= factor
+		self.rescale()
+		self.updateSlider()
+
 	
-	def handleFitToWindow(self):
-		if self.fitToWindowAct.isChecked():
-			self.fitToWindow()
-		else:
-			self.normalSize()
-		self.updateActions()
+	def updateSlider(self):
+		self.Toolbar.Slider.setValueFromFactor(self.scaleFactor)
 
 
 	def resizeEvent(self,e):
@@ -103,9 +266,13 @@ class ImageViewer(BaseWidget,QtGui.QWidget):
 			return 
 		if not hasattr(self,'_pm') or self._pm.isNull():
 			return
-		scaledSize = self.ScrollArea.ImageLabel.pixmap().size()
-		scaledSize.scale(self.ScrollArea.contentsRect().size(), Qt.KeepAspectRatio)
-		self.ScrollArea.ImageLabel.resize(scaledSize)
+		self.fitToWindow()
+
+
+	def handleFitToWindow(self):
+		if self.fitToWindowAct.isChecked():
+			self.fitToWindow()
+		self.updateActions()
 
 
 	def createActions(self):
@@ -133,9 +300,9 @@ class ImageViewer(BaseWidget,QtGui.QWidget):
 				self.setSingleStep(2)
 				self.setPageStep(10)
 				
-			def onsliderMoved(self):
-				relativeFactor = (self.getValueAsFactor()) / self._up._up.scaleFactor
-				self._up._up.scaleImage(relativeFactor)
+			def onvalueChanged(self,value):
+				self._up._up.scaleFactor = self.getValueAsFactor()
+				self._up._up.rescale()
 				
 			def setValueFromFactor(self,v):
 				bottom = math.log(MIN_SCALE)
@@ -166,20 +333,3 @@ class ImageViewer(BaseWidget,QtGui.QWidget):
 		self.Toolbar.Slider.setEnabled(not self.fitToWindowAct.isChecked())
 
 
-	def scaleImage(self, factor):
-		self.scaleFactor *= factor
-		self.ScrollArea.ImageLabel.resize(self.scaleFactor * self.ScrollArea.ImageLabel.pixmap().size())
-
-		self.adjustScrollBar(self.ScrollArea.horizontalScrollBar(), factor)
-		self.adjustScrollBar(self.ScrollArea.verticalScrollBar(), factor)
-
-		self.zoomInAct.setEnabled(self.scaleFactor < MAX_SCALE)
-		self.zoomOutAct.setEnabled(self.scaleFactor > MIN_SCALE)
-
-			
-	def updateSlider(self):
-		self.Toolbar.Slider.setValueFromFactor(self.scaleFactor)
-
-
-	def adjustScrollBar(self, scrollBar, factor):
-		scrollBar.setValue(int(factor * scrollBar.value() + ((factor - 1) * scrollBar.pageStep()/2)))

@@ -427,6 +427,8 @@ class SetupWindow(BaseWidget,QtGui.QWidget):
 				errors.append(self.tr('No camera selected'))
 		if not data.outputDirectory:
 			errors.append(self.tr('No output directory selected'))
+		elif not os.path.isdir(data.outputDirectory):
+			errors.append(self.tr('No output directory does not exist or isn\'t a directory'))
 		if not data.thumbnailSize:
 			errors.append(self.tr('No thumbnail size selected'))
 		return errors

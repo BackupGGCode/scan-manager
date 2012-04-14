@@ -3,6 +3,14 @@ from .thumbnails import ThumbnailItem, ThumbnailView, CapturedImageManager, Capt
 from . import cameracontrols
 from .dialogs import ProgressDialog
 from . import imageviewer
+import log
+
+
+try:
+	from . import calibrate
+except:
+	log.logException('Unable to import calibration tools',log.WARNING)
+	calibrate = None
 
 ### 3.0
 # import queue
@@ -54,6 +62,11 @@ class CameraControls(BaseWidget,QtGui.QTabWidget):
 		self.camera = camera
 		self.controls = []
 		self.tabs = {}
+
+		tab = GeneralTab(self)
+		self.addTab(tab,'General')
+		self.tabs['General'] = tab
+		
 		for property in camera.getProperties():
 			
 			section = property.getSection()
@@ -76,6 +89,7 @@ class CameraControls(BaseWidget,QtGui.QTabWidget):
 	def refreshFromCamera(self):
 		for control in self.controls:
 			control.fromCamera()
+
 
 
 class CameraControlsTab(BaseWidget,QtGui.QWidget):
@@ -102,6 +116,53 @@ class CameraControlsTab(BaseWidget,QtGui.QWidget):
 				self._up.setWidget(self)
 
 
+
+class GeneralTab(CameraControlsTab):
+
+	class CameraControlsTabScroll(CameraControlsTab.CameraControlsTabScroll):
+			
+		class CameraControlsTabMainArea(CameraControlsTab.CameraControlsTabScroll.CameraControlsTabMainArea):
+			
+			def init(self):
+				CameraControlsTab.CameraControlsTabScroll.CameraControlsTabMainArea.init(self)
+				
+			class CalbrationStateLabel(BaseWidget,QtGui.QLabel):
+				
+				def init(self):
+					self._up.Layout.addRow(self)
+					self.update()
+					self.app.calibrationDataChanged.connect(self.update)
+					
+				def update(self):
+					cameraIndex = self.app.cameras.index(self._up._up._up._up.camera)
+					if self.app.calibrators[cameraIndex] and self.app.calibrators[cameraIndex].isReady():
+						self.setText(self.tr('<p>Calibration active</p>'))
+					else:
+						self.setText(self.tr('<p>No calibration configured</p>'))
+			
+			class CalibrateButton(BaseWidget,QtGui.QPushButton):
+				def init(self):
+					self._up.Layout.addRow(self)
+					self.setText(self.tr('Calibrate using current image'))
+					
+				def onclicked(self):
+					if calibrate is None:
+						e = QtGui.QMessageBox.critical(
+							self.app.SetupWindow,
+							self.tr('Error'),
+							self.tr("""
+								<p>Calibration is not available on your system. If you're <i>not</i> running on Windows check that you have
+								OpenCV 2.3 for Python and NumPy installed and that the OpenCV Python bindings are on your Python path.</p> 
+							""")
+						)
+						return
+					if self.app.Preview1._pm.isNull():
+						return
+					dialog = calibrate.CalibrateDialog(self)
+					dialog.setModal(True)
+					dialog.open()
+					dialog.go(self.app.Preview1._pm)
+				
 
 
 class MainWindow(BaseWidget,QtGui.QMainWindow):
@@ -282,10 +343,8 @@ class MainWindow(BaseWidget,QtGui.QMainWindow):
 						captureThreads.append(threading.Thread(target=camera.capture))
 					for thread in captureThreads:
 						thread.start()
-						print 'starting capture thread'
+
 			
-					
-					
 	class ThumbnailDock(BaseWidget,QtGui.QDockWidget):
 		def init(self):
 			self.setWindowTitle(self.tr('Thumbnails'))
@@ -307,6 +366,7 @@ class MainWindow(BaseWidget,QtGui.QMainWindow):
 			<p>The <b>scan manager</b> automates the use of USB-tethered cameras with book scanners
 			(see <a href="http://www.diybookscanner.org">www.diybookscanner.org<a>)</p>
 			<p>This software and its associated source code is provided for free under the LGPL v3.0 license (full text <a href="http://www.gnu.org/copyleft/lesser.html">here</a>)</p> 
+			<p>The libgphoto2 backend is currently GPL rather than LGPL because of its dependency on Cygwin</a>)</p> 
 			<p>For more information please contact Oren Goldschmidt at <a href="mailto:og200@hotmail.com">og200@hotmail.com</a></p> 
 			"""
 		)
@@ -331,6 +391,8 @@ class MainWindow(BaseWidget,QtGui.QMainWindow):
 			except queue.Empty:
 				break
 			ndx = self.app.cameras.index(event.camera) + 1
+			if self.app.calibrators[ndx] and self.app.calibrators[ndx].isReady():
+				self.app.calibrators[ndx].correct() 
 			self.app.imageManager.addFromData(event.data,cameraIndex=ndx,withPreview=True)
 
 	
@@ -354,6 +416,3 @@ class MainWindow(BaseWidget,QtGui.QMainWindow):
 				preview.resize(pm.size())
 				preview.show()
 			preview.loadFromData(event.data)
-
-
-

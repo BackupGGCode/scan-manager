@@ -9,5 +9,6 @@
     	<file>zoom-out-16.png</file>
     	<file>zoom-fit-16.png</file>
     	<file>zoom-actual-16.png</file>
+    	<file>chessboard-howto.png</file>
 	</qresource>
 </RCC>

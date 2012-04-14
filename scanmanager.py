@@ -70,10 +70,11 @@ if __name__ == '__main__':
 		
 	finally:
 		
-		for api in backend.apis:
-			try: api.saveSettings()
+		if backend.apis:
+			for api in backend.apis:
+				try: api.saveSettings()
+				except: pass
+				try: api.close()
+				except: pass
+			try: app.db.close()
 			except: pass
-			try: api.close()
-			except: pass
-		try: app.db.close()
-		except: pass
