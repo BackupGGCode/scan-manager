@@ -26,10 +26,19 @@ class CropHandle(QtGui.QGraphicsRectItem):
 		if change == self.ItemPositionChange:
 			if value.x() < -(self.size/2.0):
 				value.setX(-(self.size/2.0))
-			elif value.y() < -(self.size/2.0):
+			if value.y() < -(self.size/2.0):
 				value.setY(-(self.size/2.0))
+			
+			if self.cropBox.view._image and not self.cropBox.view._image.pixmap().isNull():
+				size = self.cropBox.view._image.pixmap().size()
+				maxX = size.width()-(self.size/2.0)
+				maxY = size.height()-(self.size/2.0)
+				if value.x() > maxX:
+					value.setX(maxX)
+				if value.y() > maxY:
+					value.setY(maxY)
 		
-		if change == self.ItemPositionHasChanged:
+		elif change == self.ItemPositionHasChanged:
 			pos = self.scenePos()
 			if self is self.cropBox.tl:
 				self.cropBox.bl.setX(pos.x())
@@ -178,7 +187,7 @@ class ImageViewer(BaseWidget,QtGui.QWidget):
 			self._scene = QtGui.QGraphicsScene()
 			self.setScene(self._scene)
 			self.setBackgroundRole(QtGui.QPalette.Base)
-			self._item = None
+			self._image = None
 
 			# crop box set up
 			self._up.cropBox = CropBox(self,self._scene)
@@ -186,10 +195,10 @@ class ImageViewer(BaseWidget,QtGui.QWidget):
 			self._up.cropBox.hide()
 			
 		def setPixmap(self,pm):
-			if self._item:
-				self._scene.removeItem(self._item)
-			self._item = self._scene.addPixmap(pm)
-			self._item.setZValue(10)
+			if self._image:
+				self._scene.removeItem(self._image)
+			self._image = self._scene.addPixmap(pm)
+			self._image.setZValue(10)
 			
 		def setTransform(self,transform):
 			QtGui.QGraphicsView.setTransform(self,transform)
@@ -234,7 +243,7 @@ class ImageViewer(BaseWidget,QtGui.QWidget):
 
 
 	def fitToWindow(self):
-		if not self.ImageView._item:
+		if not self.ImageView._image:
 			return
 		if not self.fitToWindowAct.isChecked():
 			self.fitToWindowAct.setChecked(True)

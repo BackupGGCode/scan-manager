@@ -134,16 +134,43 @@ class GeneralTab(CameraControlsTab):
 					self.app.calibrationDataChanged.connect(self.update)
 					
 				def update(self):
-					cameraIndex = self.app.cameras.index(self._up._up._up._up.camera)
+					cameraIndex = self.app.cameras.index(self._up._up._up._up.camera)+1
 					if self.app.calibrators[cameraIndex] and self.app.calibrators[cameraIndex].isReady():
 						self.setText(self.tr('<p>Calibration active</p>'))
 					else:
 						self.setText(self.tr('<p>No calibration configured</p>'))
-			
+
+
+			class CorrectCheckbox(BaseWidget,QtGui.QCheckBox):
+				def init(self):
+					self._up.Layout.addRow(self)
+					self.setText(self.tr('Correct images using calibration data'))
+					self.app.calibrationDataChanged.connect(self.update)
+					cameraIndex = self.app.cameras.index(self._up._up._up._up.camera)+1
+					if self.app.calibrators[cameraIndex] and self.app.calibrators[cameraIndex].isActive():
+						self.setChecked(True)
+					else:
+						self.setChecked(False) 
+					
+					
+				def onstateChanged(self):
+					cameraIndex = self.app.cameras.index(self._up._up._up._up.camera)+1
+					if self.app.calibrators[cameraIndex]:
+						self.app.calibrators[cameraIndex].setActive(self.isChecked())
+						
+
+				def update(self):
+					cameraIndex = self.app.cameras.index(self._up._up._up._up.camera)+1
+					if self.app.calibrators[cameraIndex] and self.app.calibrators[cameraIndex].isReady():
+						self.show()
+					else:
+						self.hide()
+
+				
 			class CalibrateButton(BaseWidget,QtGui.QPushButton):
 				def init(self):
 					self._up.Layout.addRow(self)
-					self.setText(self.tr('Calibrate using current image'))
+					self.setText(self.tr('Calibrate with current iamge'))
 					
 				def onclicked(self):
 					if calibrate is None:
@@ -162,6 +189,20 @@ class GeneralTab(CameraControlsTab):
 					dialog.setModal(True)
 					dialog.open()
 					dialog.go(self.app.Preview1._pm)
+
+
+			class CropCheckbox(BaseWidget,QtGui.QCheckBox): 
+				def init(self):
+					self._up.Layout.addRow(self)
+					self.setText(self.tr('Crop images'))
+					
+				def onstateChanged(self):
+					if self.isChecked():
+						self.app.Preview1.cropBox.show()
+						self.app.Preview2.cropBox.show()
+					else:
+						self.app.Preview1.cropBox.hide()
+						self.app.Preview2.cropBox.hide()
 				
 
 

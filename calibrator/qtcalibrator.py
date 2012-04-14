@@ -4,6 +4,10 @@ import numpy as np
 
 class QTCalibrator(Calibrator):
 	
+	def __init__(self,*args,**kargs):
+		super(QTCalibrator,self).__init__(*args,**kargs)
+		self.active = False
+	
 
 	def calibrate(self,original,realSizeMM=[254.0,170.0],chessboardSize=[25,17],returnAnnotatedImage=False):
 		rc = Calibrator.calibrate(self,original=self.QPixmapToImage(original),realSizeMM=realSizeMM,chessboardSize=chessboardSize,returnAnnotatedImage=returnAnnotatedImage)
@@ -28,3 +32,12 @@ class QTCalibrator(Calibrator):
 		qimage = pixmap.toImage()
 		size = qimage.size()
 		return np.frombuffer(qimage.constBits(),np.uint8).reshape((size.height(),size.width(),4))
+
+
+	def isActive(self):
+		return getattr(self,'active',False) and self.isReady()
+
+	
+	def setActive(self,v):
+		self.active = v
+	

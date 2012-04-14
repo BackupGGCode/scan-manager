@@ -290,8 +290,8 @@ class CapturedImageManager(object):
 		image.thumbnail = self.view.new(uid=image.uid)
 		image.thumbnail.image = image
 		return image
-	
-		
+
+
 	def addFromData(self,data,cameraIndex=1,withPreview=False):
 	
 		if isinstance(data,QtGui.QPixmap):
@@ -311,14 +311,14 @@ class CapturedImageManager(object):
 		
 		if withPreview:
 			preview = getattr(self.view.app,'Preview%d'%(cameraIndex))
-			preview.loadFromData(pm)
+			preview.loadFromData(pm,cameraIndex=cameraIndex)
 
 
 	def addFromFile(self,filename,cameraIndex=1,withPreview=False):
 	
 		pm = QtGui.QPixmap()
 		pm.load(filename)
-		
+
 		for image in self.images:
 			if not image.hasImage(cameraIndex):
 				break
