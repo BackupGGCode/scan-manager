@@ -152,8 +152,8 @@ class CapturedImagePair(object):
 		self.manager = manager
 		self.filenames = {1:filename1,2:filename2}
 		self._hasImage = {1:(None,None),2:(None,None)}
-		
-		
+
+
 	def write(self,data,cameraIndex=None):
 		if self.manager.solo:
 			assert cameraIndex in (1,None)
