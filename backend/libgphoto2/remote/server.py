@@ -11,7 +11,8 @@ Pyro4.config.DETAILED_TRACEBACK = True
 Pyro4.config.HMAC_KEY = "gphotoremote"
 Pyro4.config.AUTOPROXY = True
 
-basePath = sys.argv[2]
+uriPath = sys.argv[2]
+basePath = sys.argv[3]
 
 sys.path = [basePath] + sys.path
 import api
@@ -66,8 +67,6 @@ try:
 		
 	daemon = Pyro4.Daemon()
 	uri = daemon.register(apiObject)
-	
-	uriPath = os.path.join(basePath,'remote','uri.txt')
 	
 	f = open(uriPath,'wb')
 	f.write(str(uri))

@@ -90,7 +90,7 @@ class MainWindow(BaseWidget,QtGui.QMainWindow):
 	def init(self):
 		self.setCentralWidget(self.ShootingView)
 		self.resize(900,600)
-		self.setWindowTitle(self.tr('ScanManager - shooting'))
+		self.setWindowTitle(self.tr('ScanManager %s - shooting')%smGetVersion())
 		self.setCorner(Qt.TopRightCorner,Qt.RightDockWidgetArea)
 		self.setCorner(Qt.BottomRightCorner,Qt.RightDockWidgetArea)
 		
@@ -290,7 +290,7 @@ class MainWindow(BaseWidget,QtGui.QMainWindow):
 			<p>The <b>scan manager</b> automates the use of USB-tethered cameras with book scanners
 			(see <a href="http://www.diybookscanner.org">www.diybookscanner.org<a>)</p>
 			<p>This software and its associated source code is provided for free under the LGPL v3.0 license (full text <a href="http://www.gnu.org/copyleft/lesser.html">here</a>)</p> 
-			<p>The libgphoto2 backend is currently GPL rather than LGPL because of its dependency on Cygwin</a>)</p> 
+			<p>The libgphoto2 backend is currently GPL rather than LGPL because of its dependency on Cygwin</a></p> 
 			<p>For more information please contact Oren Goldschmidt at <a href="mailto:og200@hotmail.com">og200@hotmail.com</a></p> 
 			"""
 		)

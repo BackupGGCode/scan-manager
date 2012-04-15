@@ -33,7 +33,8 @@ class PostCaptureJob(ProcessingJob):
 		# cropping
 		if self.app.settings.crop.get('enabled',False):
 			qi = self.pm.toImage()
-			qi = qi.copy(*self.app.settings.crop.coords)
+			c = self.app.settings.crop.coords
+			qi = qi.copy(c[0],c[1],c[2]-c[0],c[3]-c[1])
 			self.pm = QtGui.QPixmap.fromImage(qi)
 		
 		self.pm.save(self.image[self.cameraIndex].processed.getFilePath())

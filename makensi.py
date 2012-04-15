@@ -1,9 +1,10 @@
 TEMPLATE = r'''
-Name "ScanManager"
-OutFile "scanmanager-setup-windows-x86.exe"
+Name "ScanManager %(version)s"
+OutFile "scanmanager-setup-windows-x86-%(version)s.exe"
 InstallDir "$PROGRAMFILES\ScanManager"
 InstallDirRegKey HKLM "Software\ScanManager" "Install_Dir"
 RequestExecutionLevel admin
+Icon "scanmanager.ico"
 
 Page components
 Page directory
@@ -28,7 +29,7 @@ Section "ScanManager (required)"
     ; Create an uninstaller
     WriteUninstaller "uninstall.exe"
 
-    WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\ScanManager" "DisplayName" "ScanManager Camera Control"
+    WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\ScanManager" "DisplayName" "ScanManager Camera Control %(version)s"
     WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\ScanManager" "UninstallString" "$\"$INSTDIR\uninstall.exe$\""    
     WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\ScanManager" "QuietUninstallString" "$\"$INSTDIR\uninstall.exe$\" /S"
     
@@ -66,6 +67,8 @@ import sys
 import base
 
 basePath = os.path.join(*os.path.split(base.__file__)[:-1])
+
+version = base.smGetVersion()
 
 class File(object):
     def __init__(self,**kargs):

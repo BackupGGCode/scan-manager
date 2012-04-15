@@ -1,5 +1,6 @@
 import platform
 from glob import glob
+import base
    
 if platform.system().lower() == 'windows':
 	from distutils.core import setup
@@ -7,7 +8,7 @@ if platform.system().lower() == 'windows':
 	
 	setup(
 		name = "scanmanager",
-		version = "0.2",
+		version = base.smGetVersion(),
 		description = "Tethered shooting GUI for book scanners",
 		data_files = [
 			# Canon PS-ReC dlls
@@ -31,13 +32,15 @@ if platform.system().lower() == 'windows':
 		options = dict(
 			py2exe = dict(
 						typelibs = [('{94A0E92D-43C0-494E-AC29-FD45948A5221}', 0, 1, 0)],
-						includes = ['PySide.QtNetwork','dumbdbm','dbhash'],
+						includes = ['PySide.QtNetwork','dumbdbm','dbhash','numpy','numpy.core','numpy.core.multiarray'],
+                        excludes = ['Tkconstants','Tkinter','tcl','tk'],
 			),
 		),
 		#console = ('scanmanager.py',),
 		windows = [
 	       dict(
 				script = 'scanmanager.py',
+                icon_resources = [(1,'scanmanager.ico')]
 			)
 		],	
 	)

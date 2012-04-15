@@ -120,6 +120,10 @@ def smDataPath():
 	return target
 
 
+def smGetVersion():
+	return '0.4'
+
+
 class runtimeOptions(object):
 	"""
 	Just a container to hold runtime options shared across the system

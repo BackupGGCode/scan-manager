@@ -4,12 +4,11 @@ Wrap the API in the standard API interface
 The rest of the files here define a fully featured libgphoto2's API while this file wraps it in a simplified generic interface
 """
 
-from base import Enum, smBasePath
+from base import smBasePath, smDataPath
 from backend import interface
 
 import os.path
 import platform
-import time
 import threading
 import constants
 import log
@@ -45,7 +44,7 @@ class API(interface.API):
 			from .remote import client
 			self.api = client.GPhotoClient()
 			self.opened = True
-			self.api.open(basePath=os.path.join(smBasePath(),'backend','libgphoto2'))
+			self.api.open(workingDir=smDataPath(),basePath=os.path.join(smBasePath(),'backend','libgphoto2'))
 		else:
 			from . import api
 			self.api = api.API()

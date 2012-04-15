@@ -16,14 +16,14 @@ class GPhotoClient(object):
 	def __init__(self):
 		self.opened = False
 		
-	def open(self,basePath='',dllDir=None):
+	def open(self,workingDir,basePath='',dllDir=None):
 		
 		if dllDir is None:
 			dllDir = os.path.join(basePath,'win32')
 	
 		self.basePath = basePath
 
-		uriPath = os.path.join(basePath,'remote','uri.txt')
+		uriPath = os.path.join(workingDir,'uri.txt')
 	
 		if os.path.exists(uriPath):
 			os.remove(uriPath)
@@ -35,7 +35,12 @@ class GPhotoClient(object):
 		si.dwFlags = subprocess.STARTF_USESHOWWINDOW
 		si.wShowWindow = subprocess.SW_HIDE
 		self.process = subprocess.Popen(
-			(os.path.join(basePath,'remote','bin','gphotoremote.exe'),os.path.join(basePath,'remote','server.py'),basePath),
+			(
+				os.path.join(basePath,'remote','bin','gphotoremote.exe'),
+				os.path.join(basePath,'remote','server.py'),
+				uriPath,
+				basePath,
+			),
 			startupinfo = si
 		)
 

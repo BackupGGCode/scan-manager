@@ -214,7 +214,7 @@ class SetupWindow(BaseWidget,QtGui.QWidget):
 	def init(self):
 		self.Mode.setCurrentIndex(0)
 		self.Mode.oncurrentIndexChanged(0)
-		self.setWindowTitle(self.tr('ScanManager - settings'))
+		self.setWindowTitle(self.tr('ScanManager %s - settings')%smGetVersion())
 		self.show()
 	
 						

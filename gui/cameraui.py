@@ -151,7 +151,7 @@ class GeneralTab(CameraControlsTab):
 					def init(self):
 						self._up.Layout.addRow(self)
 						self.setText(self.tr('Calibrate with current image'))
-						self.setChecked(self.app.settings.crop.get('enabled'))
+						self.setChecked(self.app.settings.crop.get('enabled',False))
 						
 					def onclicked(self):
 						if calibrate is None:

@@ -15,7 +15,7 @@ class CalibrateDialog(BaseDialog,QtGui.QDialog):
 	
 	
 	def init(self):
-		self.setWindowTitle(self.tr('ScanManager - calibration'))
+		self.setWindowTitle(self.tr('ScanManager %s - calibration')%smGetVersion())
 		self.resize(600,600)
 	
 	def go(self,pm,cameraIndex=1):

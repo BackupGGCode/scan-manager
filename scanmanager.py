@@ -1,5 +1,6 @@
 from gui.main import App
 import sys
+import os
 import traceback
 
 from gui.dialogs import CrashDialog
@@ -53,14 +54,8 @@ if __name__ == '__main__':
 	base.runtimeOptions.trace = options.trace
 
 	if getattr(sys,'frozen',None) == 'windows_exe':
-		class Blackhole(object):
-			softspace = 0
-			def write(self, text):
-				pass
-			def flush(self):
-				pass
-		sys.stdout = Blackhole()
-		sys.stderr = Blackhole()
+		sys.stdout = open(os.path.join(base.smDataPath(),'scanmanager.stdout.log'),'wt')
+		sys.stderr = open(os.path.join(base.smDataPath(),'scanmanager.stdout.log'),'wt')
 
 	try:
 		if base.runtimeOptions.debug:
