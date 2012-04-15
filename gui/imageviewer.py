@@ -54,6 +54,7 @@ class CropHandle(QtGui.QGraphicsRectItem):
 				self.cropBox.tr.setX(pos.x())
 			for line in self.lines:
 				line.handleMoved(self,self.getCenterPos())
+			self.cropBox.rectChanged()
 		
 		return QtGui.QGraphicsRectItem.itemChange(self,change,value)
 	
@@ -79,11 +80,11 @@ class CropHandle(QtGui.QGraphicsRectItem):
 		pos.setY(y)
 		self.setPos(pos)
 
-
 	@property
 	def size(self):
 		return self.cropBox.view.transform().inverted()[0].mapRect(self.rect()).width()
 	
+
 	
 class CropLine(QtGui.QGraphicsLineItem):
 	def __init__(self,cropBox,handle1,handle2):
@@ -103,10 +104,8 @@ class CropLine(QtGui.QGraphicsLineItem):
 		p1 = line.p1()
 		p2 = line.p2()
 		if handle is self.handle1:
-			l = QtCore.QLineF(position,p2)
 			self.setLine(QtCore.QLineF(position,p2))
 		elif handle is self.handle2:
-			l = QtCore.QLineF(p1,position)
 			self.setLine(QtCore.QLineF(p1,position))
 		else:
 			raise Exception('unknown handle %s'%handle)
@@ -142,19 +141,40 @@ class CropBox(object):
 	def show(self):
 		for i in self.lines + self.handles:
 			i.show()
-		
-	def setRect(self,rect):
+
+	def _setRect(self,rect):		
 		self.tl.setCenterPos(rect.topLeft())
 		self.tr.setCenterPos(rect.topRight())
 		self.bl.setCenterPos(rect.bottomLeft())
 		self.br.setCenterPos(rect.bottomRight())
+		
+	def setRect(self,rect):
+		self._setRect(rect)
 		self.recalc()
 		
 	def recalc(self):
+		if getattr(self,'lastrect',None):
+			self.setImageRect(self.lastrect)
+		
 		for line in self.lines:
 			line.handleMoved(line.handle1,line.handle1.getCenterPos())
 			line.handleMoved(line.handle2,line.handle2.getCenterPos())
 		self.scene.setSceneRect(self.scene.itemsBoundingRect())
+		
+	def getImageRect(self):
+		rect = QtCore.QRectF(self.tl.getCenterPos(),self.br.getCenterPos())
+		return rect
+	
+	def setImageRect(self,rect):
+		self._setRect(rect)
+
+	def rectChanged(self):
+		rect = self.getImageRect()
+		self.lastrect = rect
+		coords = tuple([int(round(i)) for i in rect.getCoords()])
+		self.view.app.cropboxChanged.emit(self.view,coords) 
+
+
 #
 # Start image viewer stuff
 #		
@@ -273,10 +293,12 @@ class ImageViewer(BaseWidget,QtGui.QWidget):
 	def resizeEvent(self,e):
 		if not self.fitToWindowAct.isChecked():
 			return 
-		if not hasattr(self,'_pm') or self._pm.isNull():
+		if not self.hasImage():
 			return
 		self.fitToWindow()
 
+	def hasImage(self):
+		return hasattr(self,'_pm') and not self._pm.isNull()
 
 	def handleFitToWindow(self):
 		if self.fitToWindowAct.isChecked():

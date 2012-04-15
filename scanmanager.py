@@ -25,10 +25,15 @@ def excepthook(excType, excValue, tracebackobj):
 	excInfo = (excType, excValue, tracebackobj)
 	text = log.logException(excInfo=excInfo)
 	try:
-		dialog = CrashDialog(parent=app.activeWindow(),html='<pre>%s</pre>'%text)
+		dialog = CrashDialog(parent=None,html='<pre>%s</pre>'%text)
 		dialog.open()
 	except:
 		pass
+	try:
+		app.close()
+	except:
+		pass
+	
 
 
 
@@ -38,6 +43,7 @@ if __name__ == '__main__':
 		def print_help(self):
 			print 'ScanManager'
 			print COMMAND_LINE_HELP
+			
 	parser = MyOptParser()
 	parser.add_option('-d','--debug',action='store_true',dest='debug')
 	parser.add_option('-t','--trace',action='store_true',dest='trace')
@@ -69,12 +75,17 @@ if __name__ == '__main__':
 		app.exec_()
 		
 	finally:
-		
+		try:
+			app.allDone = True # to kill the processing thread
+		except:
+			pass
 		if backend.apis:
 			for api in backend.apis:
 				try: api.saveSettings()
 				except: pass
 				try: api.close()
 				except: pass
-			try: app.db.close()
-			except: pass
+		try: app.settings.save()
+		except: log.logException('failed saving settings', log.ERROR)
+		try: app.db.close()
+		except: pass

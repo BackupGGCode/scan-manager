@@ -20,8 +20,10 @@ class CalibrateDialog(BaseDialog,QtGui.QDialog):
 	
 	def go(self,pm,cameraIndex=1):
 		
-		if self.app.calibrators[cameraIndex]:
-			self.calibrator = self.app.calibrators[cameraIndex]
+		self.cameraIndex = cameraIndex
+		
+		if self.app.settings.calibrators[cameraIndex]:
+			self.calibrator = self.app.settings.calibrators[cameraIndex]
 			self.realSizeMM = list(self.calibrator.realSizeMM)
 			self.chessboardSize = list(self.calibrator.boardSize)
 		else:
@@ -29,7 +31,7 @@ class CalibrateDialog(BaseDialog,QtGui.QDialog):
 			self.realSizeMM=[254.0,170.0]
 			self.chessboardSize=[25,17]
 			
-		self.app.calibrators[cameraIndex] = self.calibrator
+		self.app.settings.calibrators[cameraIndex] = self.calibrator
 			
 		self.Viewers.CalibrateBefore.loadFromData(pm)
 		self.original = pm
@@ -59,8 +61,7 @@ class CalibrateDialog(BaseDialog,QtGui.QDialog):
 		self.close()
 		
 	def doClear(self):
-		self.app.calibrators = [None,None]
-		self.app.db['calibrators'] = self.app.calibrators
+		self.app.settings.calibrators[self.cameraIndex] = None
 		self.app.calibrationDataChanged.emit()
 		self.close()
 		
@@ -101,7 +102,6 @@ class CalibrateDialog(BaseDialog,QtGui.QDialog):
 		self.Viewers.CalibrateAfter.loadFromData(corrected)
 
 	def doApply(self):
-		self.app.db['calibrators'] = self.app.calibrators
 		self.app.calibrationDataChanged.emit()
 		self.close()
 
@@ -223,7 +223,7 @@ class CalibrateDialog(BaseDialog,QtGui.QDialog):
 			class ClearButton(BaseWidget,QtGui.QPushButton):
 				def init(self):
 					self._up.Layout.addWidget(self)
-					self.setText(self.tr('Clear calibration data and exit'))
+					self.setText(self.tr('Clear data and exit'))
 					
 				def onclicked(self):
 					self._up._up._up.doClear()
@@ -232,7 +232,7 @@ class CalibrateDialog(BaseDialog,QtGui.QDialog):
 				def init(self):
 					self._up.Layout.addWidget(self)
 					self.hide()
-					self.setText(self.tr('Save and apply to new images'))
+					self.setText(self.tr('Save and exit'))
 					
 				def onclicked(self):
 					self._up._up._up.doApply()

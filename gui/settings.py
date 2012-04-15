@@ -318,7 +318,7 @@ class SetupWindow(BaseWidget,QtGui.QWidget):
 				progress = ProgressDialog(parent=self.app.SetupWindow,text='Connecting to cameras (may take some time for WIA)')
 				progress.open()
 				
-				self.app.settings = data
+				self.app.setup = data
 				self.app.SetupWindow.saveSettings(data)
 				
 				i = 3
@@ -390,16 +390,16 @@ class SetupWindow(BaseWidget,QtGui.QWidget):
 			out.cameraC = cameraToName(data.cameraC)
 		out.outputDirectory = data.outputDirectory
 		out.thumbnailSize = data.thumbnailSize
-		self.app.db['setup'] = out
+		self.app.settings.setup = out
 		
 	
 	def loadSettings(self):
 		"""
 		Load previous settings from the the app's shelve db
 		"""
-		if 'setup' not in self.app.db:
+		if 'setup' not in self.app.settings:
 			return
-		data = self.app.db['setup']
+		data = self.app.settings.setup
 		if data.mode == Mode.V:
 			data.cameraL = cameraFromName(data.cameraL)
 			data.cameraR = cameraFromName(data.cameraR)

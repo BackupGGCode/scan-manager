@@ -178,7 +178,7 @@ class Calibrator(object):
 		self.calculatePerspective(undistortedCorners)
 		if returnAnnotatedImage:
 			annotatedImage = original.copy()
-			cv2.drawChessboardCorners(annotatedImage,tuple(chessboardSize),self._corners,1)
+			cv2.drawChessboardCorners(annotatedImage,tuple(chessboardSize),self._corners,True)
 			return annotatedImage
 		else:
 			return True

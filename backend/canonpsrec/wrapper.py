@@ -300,7 +300,7 @@ class UnlockFocus(PSRECCameraButton):
 class StartViewfinder(PSRECCameraButton):
 	propertyId = '_START_VIEWFINDER'
 	name = 'Start viewfinder'
-	section = 'Capture Settings'
+	section = 'General'
 	controlType = interface.ControlType.Button
 	def go(self):
 		self.camera.startViewfinder()
@@ -309,7 +309,7 @@ class StartViewfinder(PSRECCameraButton):
 class StopViewfinder(PSRECCameraButton):
 	propertyId = '_STOP_VIEWFINDER'
 	name = 'Stop viewfinder'
-	section = 'Capture Settings'
+	section = 'General'
 	controlType = interface.ControlType.Button
 	def go(self):
 		self.camera.stopViewfinder()

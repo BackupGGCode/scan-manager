@@ -1,21 +1,14 @@
 from .common import *
-from .thumbnails import ThumbnailItem, ThumbnailView, CapturedImageManager, CapturedImagePair
-from . import cameracontrols
+from .thumbnails import ThumbnailView
+from .imagemanager import CapturedImageManager
 from .dialogs import ProgressDialog
 from . import imageviewer
+from . import processing
+from .cameraui import CameraControls
 import log
 
-
-try:
-	from . import calibrate
-except:
-	log.logException('Unable to import calibration tools',log.WARNING)
-	calibrate = None
-
-### 3.0
-# import queue
-import Queue as queue
 import threading
+
 
 
 class LiveView(BaseWidget,QtGui.QLabel):
@@ -53,166 +46,47 @@ class LiveView(BaseWidget,QtGui.QLabel):
 			self.setPixmap(self._pm.scaled(self.size(),Qt.KeepAspectRatio))
 		else:
 			self.setPixmap(self._pm)
-		
-
-
-class CameraControls(BaseWidget,QtGui.QTabWidget):
-
-	def setup(self,camera):
-		self.camera = camera
-		self.controls = []
-		self.tabs = {}
-
-		tab = GeneralTab(self)
-		self.addTab(tab,'General')
-		self.tabs['General'] = tab
-		
-		for property in camera.getProperties():
-			
-			section = property.getSection()
-			if section not in self.tabs:
-				tab = CameraControlsTab(self)
-				self.addTab(tab,section)
-				self.tabs[section] = tab
-				tab._up = self 
-				
-			tab = self.tabs[section]
-			cls = cameracontrols.controlTypeToClass[property.getControlType()]
-			control = cls(qtparent=tab.CameraControlsTabScroll.CameraControlsTabMainArea,cameraProperty=property)
-			self.controls.append(control)
-
-		self.refreshFromCamera()
-		
-		for tab in self.tabs.values():
-			tab.CameraControlsTabScroll.CameraControlsTabMainArea.adjustSize()
-		
-	def refreshFromCamera(self):
-		for control in self.controls:
-			control.fromCamera()
-
-
-
-class CameraControlsTab(BaseWidget,QtGui.QWidget):
 	
+
+
+class PreviewTab(BaseWidget,QtGui.QWidget):
+
 	class Layout(BaseLayout,QtGui.QVBoxLayout):
 		def init(self):
 			self._up.setLayout(self)
 			self.setSpacing(0)
 			self.setContentsMargins(0,0,0,0)
+			self.addWidget(self._up.PreviewImage,1)
 			
-	class CameraControlsTabScroll(BaseWidget,QtGui.QScrollArea):
-		def init(self):
-			self._up.Layout.addWidget(self,1)
-			self.setContentsMargins(0,0,0,0)
-			
-		class CameraControlsTabMainArea(BaseWidget,QtGui.QWidget):
-			
-			class Layout(BaseLayout,QtGui.QFormLayout):
-				def init(self):
-					self._up.setLayout(self)
+	class PreviewImage(imageviewer.ImageViewer):
+		pass
 		
-			def init(self):
-				self.setSizePolicy(QtGui.QSizePolicy.Ignored,QtGui.QSizePolicy.Ignored)
-				self._up.setWidget(self)
 
 
+class Preview(BaseWidget,QtGui.QTabWidget):
+	
+	def init(self):
+		self.addTab(self.PreviewRaw,self.tr('Raw'))
+		self.addTab(self.PreviewProcessed,self.tr('Processed'))
+		self.raw = self.PreviewRaw.PreviewImage
+		self.processed = self.PreviewProcessed.PreviewImage
 
-class GeneralTab(CameraControlsTab):
+	class PreviewRaw(PreviewTab):
+		pass
 
-	class CameraControlsTabScroll(CameraControlsTab.CameraControlsTabScroll):
-			
-		class CameraControlsTabMainArea(CameraControlsTab.CameraControlsTabScroll.CameraControlsTabMainArea):
-			
-			def init(self):
-				CameraControlsTab.CameraControlsTabScroll.CameraControlsTabMainArea.init(self)
-				
-			class CalbrationStateLabel(BaseWidget,QtGui.QLabel):
-				
-				def init(self):
-					self._up.Layout.addRow(self)
-					self.update()
-					self.app.calibrationDataChanged.connect(self.update)
-					
-				def update(self):
-					cameraIndex = self.app.cameras.index(self._up._up._up._up.camera)+1
-					if self.app.calibrators[cameraIndex] and self.app.calibrators[cameraIndex].isReady():
-						self.setText(self.tr('<p>Calibration active</p>'))
-					else:
-						self.setText(self.tr('<p>No calibration configured</p>'))
+	class PreviewProcessed(PreviewTab):
+		pass
+	
+	def showCropBox(self):
+		self.processed.cropBox.show()
 
+	def hideCropBox(self):
+		self.processed.cropBox.hide()
 
-			class CorrectCheckbox(BaseWidget,QtGui.QCheckBox):
-				def init(self):
-					self._up.Layout.addRow(self)
-					self.setText(self.tr('Correct images using calibration data'))
-					self.app.calibrationDataChanged.connect(self.update)
-					cameraIndex = self.app.cameras.index(self._up._up._up._up.camera)+1
-					if self.app.calibrators[cameraIndex] and self.app.calibrators[cameraIndex].isActive():
-						self.setChecked(True)
-					else:
-						self.setChecked(False) 
-					
-					
-				def onstateChanged(self):
-					cameraIndex = self.app.cameras.index(self._up._up._up._up.camera)+1
-					if self.app.calibrators[cameraIndex]:
-						self.app.calibrators[cameraIndex].setActive(self.isChecked())
-						
-
-				def update(self):
-					cameraIndex = self.app.cameras.index(self._up._up._up._up.camera)+1
-					if self.app.calibrators[cameraIndex] and self.app.calibrators[cameraIndex].isReady():
-						self.show()
-					else:
-						self.hide()
-
-				
-			class CalibrateButton(BaseWidget,QtGui.QPushButton):
-				def init(self):
-					self._up.Layout.addRow(self)
-					self.setText(self.tr('Calibrate with current iamge'))
-					
-				def onclicked(self):
-					if calibrate is None:
-						e = QtGui.QMessageBox.critical(
-							self.app.SetupWindow,
-							self.tr('Error'),
-							self.tr("""
-								<p>Calibration is not available on your system. If you're <i>not</i> running on Windows check that you have
-								OpenCV 2.3 for Python and NumPy installed and that the OpenCV Python bindings are on your Python path.</p> 
-							""")
-						)
-						return
-					if self.app.Preview1._pm.isNull():
-						return
-					dialog = calibrate.CalibrateDialog(self)
-					dialog.setModal(True)
-					dialog.open()
-					dialog.go(self.app.Preview1._pm)
-
-
-			class CropCheckbox(BaseWidget,QtGui.QCheckBox): 
-				def init(self):
-					self._up.Layout.addRow(self)
-					self.setText(self.tr('Crop images'))
-					
-				def onstateChanged(self):
-					if self.isChecked():
-						self.app.Preview1.cropBox.show()
-						self.app.Preview2.cropBox.show()
-					else:
-						self.app.Preview1.cropBox.hide()
-						self.app.Preview2.cropBox.hide()
-				
-
+	
 
 class MainWindow(BaseWidget,QtGui.QMainWindow):
 	
-	def __init__(self,*args,**kargs):
-		super(MainWindow,self).__init__(*args,**kargs)
-		self.viewfinderEventQ = queue.Queue()
-		self.captureCompleteEventQ = queue.Queue()
-
 	def init(self):
 		self.setCentralWidget(self.ShootingView)
 		self.resize(900,600)
@@ -231,15 +105,16 @@ class MainWindow(BaseWidget,QtGui.QMainWindow):
 		Setup stuff that needs to be organised just before we start shooting frames
 		"""
 		
-		solo = (self.app.settings.mode == Mode.Flat) #: solo is True if we're using single rather than paired images (N.B. that this is NOT the same as only have one camera) 
+		solo = (self.app.setup.mode == Mode.Flat) #: solo is True if we're using single rather than paired images (N.B. that this is NOT the same as only have one camera) 
 		
 		# override default thumbnail sizes using user-selected sizes
-		if 'thumbnailSize' in self.app.settings:
-			self.app.Thumbnails.thumbnailWidth = self.app.settings.thumbnailSize[0]
-			self.app.Thumbnails.thumbnailHeight = self.app.settings.thumbnailSize[1]
+		if 'thumbnailSize' in self.app.setup:
+			self.app.Thumbnails.thumbnailWidth = self.app.setup.thumbnailSize[0]
+			self.app.Thumbnails.thumbnailHeight = self.app.setup.thumbnailSize[1]
 			
 		# set up the image manager to manage captured images and control the thumbnail view 
-		self.app.imageManager = CapturedImageManager(path=self.app.settings.outputDirectory,view=self.app.Thumbnails,solo=solo)
+		self.app.imageManager = CapturedImageManager(path=self.app.setup.outputDirectory,view=self.app.Thumbnails,solo=solo)
+		self.app.Thumbnails.solo = solo
 		progress = ProgressDialog(parent=self.app.MainWindow,text='Thumbnailing existing images',minimum=0,maximum=100)
 		
 		# the the image manager with any pre-existing images in the target directory
@@ -247,9 +122,10 @@ class MainWindow(BaseWidget,QtGui.QMainWindow):
 		self.app.imageManager.fillFromDirectory(progressCallback=lambda total,done: progress.setValue(int((float(done)/float(total))*100.0)))
 		progress.close()
 		# for solo mode
-		if self.app.settings.mode != Mode.V:
+		if self.app.setup.mode != Mode.V:
 			self.app.Camera2Dock.hide()
 			self.app.Preview2.hide()
+			self.app.previews = self.app.previews[:2]
 		
 		# give controls for each camera a change to do their own initialisation (mainly reading initial data from the camera)
 		for ndx,camera in enumerate(self.app.cameras):
@@ -260,10 +136,15 @@ class MainWindow(BaseWidget,QtGui.QMainWindow):
 		if not (self.app.cameras[0].hasCapture() or self.app.cameras[0].hasCapture()):
 			self.app.CaptureButton.hide()
 
+		# start the processing thread
+		self.app.processingThread = processing.ProcessingThread(app=self.app)
+		self.app.processingThread.start()
+
 		
 	class ShootingView(BaseWidget,QtGui.QWidget):
 		def init(self):
 			self.setMinimumHeight(200)
+			self.app.previews = [None,self.Preview1,self.Preview2] # add a none at the start so we can index directly by cameraIndex
 	
 		class Layout(BaseLayout,QtGui.QHBoxLayout):
 			def init(self):
@@ -273,10 +154,10 @@ class MainWindow(BaseWidget,QtGui.QMainWindow):
 				self.addWidget(self._up.Preview1,1)
 				self.addWidget(self._up.Preview2,1)
 		
-		class Preview1(imageviewer.ImageViewer):
+		class Preview1(Preview):
 				pass
 		
-		class Preview2(imageviewer.ImageViewer):
+		class Preview2(Preview):
 				pass
 		
 		
@@ -295,7 +176,7 @@ class MainWindow(BaseWidget,QtGui.QMainWindow):
 				self.addWidget(self.Camera1Controls)
 				self.setFrameStyle(QtGui.QFrame.StyledPanel)
 				self.setLineWidth(1)
-				self.setStretchFactor(0,10000)
+				self.setStretchFactor(0,1)
 				self.setStretchFactor(1,1)
 			
 			class Viewfinder1(LiveView):
@@ -324,6 +205,8 @@ class MainWindow(BaseWidget,QtGui.QMainWindow):
 				self.addWidget(self.Camera2Controls)
 				self.setFrameStyle(QtGui.QFrame.StyledPanel)
 				self.setLineWidth(1)
+				self.setStretchFactor(0,1)
+				self.setStretchFactor(1,1)
 			
 			class Viewfinder2(LiveView):
 				def init(self):
@@ -416,44 +299,68 @@ class MainWindow(BaseWidget,QtGui.QMainWindow):
 	# Shooting window methods
 	#
 	
-	captureComplete = QtCore.Signal()
-	viewfinderFrame = QtCore.Signal()
+	captureComplete = QtCore.Signal(object)
+	viewfinderFrame = QtCore.Signal(object)
 
 	def captureCompleteCallback(self,event):
-		# we have to do this via a signal because you can't have a non-gui thread doing gui stuff in Qt
-		self.captureCompleteEventQ.put(event)
-		self.captureComplete.emit()
+		# we have to do this via a signal because you can't have a non-gui thread doing gui stuff in Qt (this mainly affects PS-ReC drivers)
+		self.captureComplete.emit(event)
 
 		
-	def oncaptureComplete(self):
-		while 1:
-			try:
-				event = self.captureCompleteEventQ.get(False)
-			except queue.Empty:
-				break
-			ndx = self.app.cameras.index(event.camera) + 1
-			if self.app.calibrators[ndx] and self.app.calibrators[ndx].isReady():
-				self.app.calibrators[ndx].correct() 
-			self.app.imageManager.addFromData(event.data,cameraIndex=ndx,withPreview=True)
+	def oncaptureComplete(self,event):
+		cameraIndex = self.app.cameras.index(event.camera) + 1
+		pm = QtGui.QPixmap()
+		pm.loadFromData(event.data)
+		
+		# rotation for preview only
+		angle = self.app.settings.rotate[cameraIndex]
+		if angle:
+			transform = QtGui.QTransform()
+			transform.rotate(angle)
+			pm = pm.transformed(transform)
+			
+		image = self.app.imageManager.addFromData(pm=pm,cameraIndex=cameraIndex,withPreview=True)
+		self.app.processingQueue.put(processing.PostCaptureJob(app=self.app,image=image,cameraIndex=cameraIndex,pm=pm))
 
 	
 	def viewfinderFrameCallback(self,event):
-		# we have to do this via a signal because you can't have a non-gui thread doing gui stuff in Qt
-		self.viewfinderEventQ.put(event)
-		self.viewfinderFrame.emit()
+		# we have to do this via a signal because you can't have a non-gui thread doing gui stuff in Qt (this mainly affects PS-ReC drivers)
+		self.viewfinderFrame.emit(event)
 
 
-	def onviewfinderFrame(self):
-		while 1:
-			try:
-				event = self.viewfinderEventQ.get(False)
-			except queue.Empty:
-				break
-			ndx = self.app.cameras.index(event.camera)
-			preview = getattr(self.app,'Viewfinder%d'%(ndx+1))
-			if preview.isHidden():
-				pm = QtGui.QPixmap()
-				pm.loadFromData(event.data)
-				preview.resize(pm.size())
-				preview.show()
-			preview.loadFromData(event.data)
+	def onviewfinderFrame(self,event):
+		cameraIndex = self.app.cameras.index(event.camera) + 1
+		viewfinder = getattr(self.app,'Viewfinder%d'%(cameraIndex))
+
+		pm = QtGui.QPixmap()
+		pm.loadFromData(event.data)
+		
+		if viewfinder.isHidden():
+			viewfinder.resize(pm.size())
+			viewfinder.show()
+			
+		# rotation
+		angle = self.app.settings.rotate[cameraIndex]
+		if angle:
+			transform = QtGui.QTransform()
+			transform.rotate(angle)
+			pm = pm.transformed(transform)
+			
+		# correction
+		if self.app.settings.calibrators[cameraIndex] and self.app.settings.calibrators[cameraIndex].isActive():
+			pm = self.app.settings.calibrators[cameraIndex].correct(pm)
+			
+		viewfinder.loadFromData(pm)
+
+
+	#
+	# Background processing of captured frames
+	#
+	
+	processingCompleted = QtCore.Signal(object)
+	
+	def onprocessingCompleted(self,item):
+		item.oncompletion()
+		
+		
+		
