@@ -1,6 +1,6 @@
 
-Name "ScanManager 0.4"
-OutFile "scanmanager-setup-windows-x86-0.4.exe"
+Name "ScanManager 0.4.1"
+OutFile "scanmanager-setup-windows-x86-0.4.1.exe"
 InstallDir "$PROGRAMFILES\ScanManager"
 InstallDirRegKey HKLM "Software\ScanManager" "Install_Dir"
 RequestExecutionLevel admin
@@ -246,7 +246,7 @@ Section "ScanManager (required)"
     ; Create an uninstaller
     WriteUninstaller "uninstall.exe"
 
-    WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\ScanManager" "DisplayName" "ScanManager Camera Control 0.4"
+    WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\ScanManager" "DisplayName" "ScanManager Camera Control 0.4.1"
     WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\ScanManager" "UninstallString" "$\"$INSTDIR\uninstall.exe$\""    
     WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\ScanManager" "QuietUninstallString" "$\"$INSTDIR\uninstall.exe$\" /S"
     
@@ -476,17 +476,17 @@ Section "Uninstall"
     Delete $INSTDIR\uninstall.exe
 
     ; Remove directories used
-    RMDir "$INSTDIR\imageformats"
-    RMDir "$INSTDIR\backend"
-    RMDir "$INSTDIR\backend\canonpsrec"
-    RMDir "$INSTDIR\backend\libgphoto2"
-    RMDir "$INSTDIR\backend\libgphoto2\remote"
-    RMDir "$INSTDIR\backend\libgphoto2\remote\bin"
-    RMDir "$INSTDIR\backend\libgphoto2\win32"
-    RMDir "$INSTDIR\backend\libgphoto2\win32\camlibs"
-    RMDir "$INSTDIR\backend\libgphoto2\win32\iolibs"
-    RMDir "$INSTDIR\backend\nikonsdk"
 
+    RMDir "$INSTDIR\backend\nikonsdk"
+    RMDir "$INSTDIR\backend\libgphoto2\win32\iolibs"
+    RMDir "$INSTDIR\backend\libgphoto2\win32\camlibs"
+    RMDir "$INSTDIR\backend\libgphoto2\win32"
+    RMDir "$INSTDIR\backend\libgphoto2\remote\bin"
+    RMDir "$INSTDIR\backend\libgphoto2\remote"
+    RMDir "$INSTDIR\backend\libgphoto2"
+    RMDir "$INSTDIR\backend\canonpsrec"
+    RMDir "$INSTDIR\backend"
+    RMDir "$INSTDIR\imageformats"
     RMDir "$INSTDIR"
 
     ; Remove registry keys

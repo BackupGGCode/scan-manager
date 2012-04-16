@@ -1,4 +1,4 @@
-import cv, cv2
+import cv2, cv
 import numpy as np
 import cPickle
 

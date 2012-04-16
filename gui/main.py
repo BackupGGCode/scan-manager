@@ -3,6 +3,7 @@ from . import shooting
 from . import settings
 import backend
 import base
+import log
 
 import shelve
 import Queue
@@ -25,7 +26,10 @@ class ApplicationMainSettings(object):
 		for k in self.__dict__:
 			if k == '_db':
 				continue
-			self._db[k] = getattr(self,k)
+			try:
+				self._db[k] = getattr(self,k)
+			except:
+				log.error('error saving %s in settings db'%k)
 	def load(self):
 		for k,v in self._db.items():
 			setattr(self,k,v)

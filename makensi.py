@@ -102,7 +102,9 @@ def l(path,recurse=True):
         if f.isdir and recurse:
             l(f.path)
 
+
 l('dist')
+deleteDirs = '\n'.join(reversed(deleteDirs.split('\n')))
 f = open('scanmanager.nsi','wt')
 f.write(TEMPLATE%globals())
 f.close()

@@ -5,6 +5,7 @@ import backend
 
 import base
 import log
+import copy
 
 
 class FormData(BaseSettings):
@@ -399,7 +400,7 @@ class SetupWindow(BaseWidget,QtGui.QWidget):
 		"""
 		if 'setup' not in self.app.settings:
 			return
-		data = self.app.settings.setup
+		data = copy.deepcopy(self.app.settings.setup)
 		if data.mode == Mode.V:
 			data.cameraL = cameraFromName(data.cameraL)
 			data.cameraR = cameraFromName(data.cameraR)

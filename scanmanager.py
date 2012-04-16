@@ -1,16 +1,13 @@
-from gui.main import App
 import sys
 import os
 import traceback
 
-from gui.dialogs import CrashDialog
-
 import log
 import optparse
-import base
-import backend
+import platform
 
-import resources
+import base
+
 
 
 COMMAND_LINE_HELP = """Usage: scanmanager [--debug]
@@ -63,7 +60,19 @@ if __name__ == '__main__':
 		else:
 			log.configureLogging(fileLevel=log.DEBUG,screenLevel=log.WARNING)
 			
-		log.debug('starting up')
+		log.debug('starting up on %s'%sys.platform)
+		
+		try:
+			log.debug('running on %s'%('; '.join(platform.uname())))
+		except:
+			pass
+		
+		from gui.main import App
+		from gui.dialogs import CrashDialog
+		import backend
+		import resources
+		
+		log.debug('opening application')
 		
 		app = App(sys.argv)
 		sys.excepthook = excepthook

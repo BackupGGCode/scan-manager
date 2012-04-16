@@ -170,6 +170,7 @@ class GeneralTab(CameraControlsTab):
 						
 						if not preview.raw.hasImage():
 							return
+						
 						dialog = calibrate.CalibrateDialog(self)
 						dialog.setModal(True)
 						dialog.open()
