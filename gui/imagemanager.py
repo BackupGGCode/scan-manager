@@ -18,16 +18,21 @@ from . import processing
 
 
 class ThumbnailJob(processing.ProcessingJob):
+
+	priority = 100
 	
-	def __init__(self,app,image,cameraIndex,withPreview=False):
+	def __init__(self,app,image,cameraIndex,size,withPreview=False):
 		self.app = app
 		self.image = image
 		self.cameraIndex = cameraIndex
+		self.size = size
 		self.withPreview = withPreview
 		
 	def execute(self):
-		self.pm = QtGui.QPixmap()
-		self.pm.load(self.image[self.cameraIndex].raw.getFilePath())
+		qi = QtGui.QImage(self.image[self.cameraIndex].raw.getFilePath())
+		qi = qi.scaled(self.size[1], self.size[0], aspectRatioMode=Qt.KeepAspectRatio,transformMode=Qt.SmoothTransformation)
+		#qi.save(self.image[self.cameraIndex].getThumbnailPath(self.size))
+		self.pm = QtGui.QPixmap(qi)
 
 	def oncompletion(self):
 		self.image.thumbnail.updateImage(self.pm,cameraIndex=self.cameraIndex)
@@ -79,7 +84,7 @@ class CapturedImageFile(object):
 	def getFilePath(self):
 		return os.path.join(self.path,self.filename)
 	
- 
+
 
 
 class CapturedImage(object):
@@ -147,8 +152,8 @@ class CapturedImagePair(CapturedImageBase):
 	
 	def rename(self,filename):
 		base,ext = os.path.splitext(filename)
-		self.left.rename('%sL.%s'%(base,ext))
-		self.right.rename('%sR.%s'%(base,ext))
+		self.left.rename('%sL%s'%(base,ext))
+		self.right.rename('%sR%s'%(base,ext))
 
 
 class CapturedImageSingle(CapturedImageBase):
@@ -275,7 +280,15 @@ class CapturedImageManager(object):
 		else:
 			image = self.new(baseFilename)
 			
-		self.view.app.processingQueue.put(ThumbnailJob(app=self.view.app,image=image,cameraIndex=cameraIndex,withPreview=withPreview))
+		self.view.app.processingQueue.put(
+			ThumbnailJob(
+				app = self.view.app,
+				image = image,
+				cameraIndex = cameraIndex,
+				size = (self.view.thumbnailWidth,self.view.thumbnailHeight),
+				withPreview = withPreview
+			)
+		)
 
 		return image
 
@@ -328,8 +341,12 @@ class CapturedImageManager(object):
 			preview = self.view.app.previews[cameraIndex]
 			if image[cameraIndex].raw.exists():
 				preview.raw.load(image[cameraIndex].raw.getFilePath())
+			else:
+				preview.raw.clear()
 			if image[cameraIndex].processed.exists():
 				preview.processed.load(image[cameraIndex].processed.getFilePath())
+			elif preview.raw.hasImage():
+				preview.processed.loadFromData(preview.raw._pm)
 		self.selected = image
 		
 	

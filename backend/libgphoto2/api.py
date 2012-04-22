@@ -1,14 +1,11 @@
 #
 # Based on: piggyphoto.py which is Copyright (C) 2010 Alex Dumitrache
 #
-
 import os
 import ctypes
 import time
 import sys
 import weakref
-
-sys.path = ['.'] + sys.path
 
 import structures
 from constants import *
@@ -96,6 +93,7 @@ class API(object):
 			self.checkedGP = CheckedTracedDLL(self,gp,checked=True,traced=False)
 			self.checkedGPP = CheckedTracedDLL(self,gpp,checked=True,traced=False)
 		self.context = self.gp.gp_context_new()
+
 
 	def getVersion(self,verbose=True):
 		self.gp.gp_library_version.restype = ctypes.POINTER(ctypes.c_char_p)
@@ -438,6 +436,7 @@ class Camera(object):
 		self.api.check(rc)
 		self.initialized = True
 
+
 	def reinit(self):
 		self.api.checkedGP.gp_camera_unref(self.c)
 		self.initialized = False
@@ -486,8 +485,7 @@ class Camera(object):
 		self.api.check(rc)
 
 		cfile = CameraFile(self.api,self,path.folder,path.name)
-		self.api.register(cfile)
-		return cfile
+		return cfile.getData()
 
 	def capturePreview(self, destpath = None):
 		path = structures.CameraFilePath()
@@ -505,8 +503,7 @@ class Camera(object):
 		if destpath:
 			cfile.save(destpath)
 		else:
-			self.api.register(cfile)
-			return cfile
+			return cfile.getData()
 
 	def downloadFile(self, srcfolder, srcfilename, destpath):
 		cfile = CameraFile(self,srcfolder,srcfilename)

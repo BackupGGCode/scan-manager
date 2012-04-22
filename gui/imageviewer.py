@@ -211,24 +211,83 @@ class ImageViewer(BaseWidget,QtGui.QWidget):
 
 			# crop box set up
 			self._up.cropBox = CropBox(self,self._scene)
-			self._up.cropBox.setRect(QtCore.QRectF(0,0,100.0,100.0))
+			self._up.cropBox.setRect(QtCore.QRectF(0,0,400.0,400.0))
 			self._up.cropBox.hide()
+
+			self.currentCenter = None
+			self.setCenter(QtCore.QPointF(0, 0))
 			
 		def setPixmap(self,pm):
-			if self._image:
-				self._scene.removeItem(self._image)
-			self._image = self._scene.addPixmap(pm)
-			self._image.setZValue(10)
+			#if self._image:
+			#	self._scene.removeItem(self._image)
+			if not self._image:
+				self._image = self._scene.addPixmap(pm)
+				self._image.setZValue(10)
+			self._image.setPixmap(pm)
 			
 		def setTransform(self,transform):
 			QtGui.QGraphicsView.setTransform(self,transform)
 			# crop box (allow it to rescale lines) 
 			self._up.cropBox.recalc()
 			
+		def wheelEvent(self, event):
+			if self._up.fitToWindowAct.isChecked():
+				self._up.fitToWindowAct.setChecked(False)
+				self._up.updateActions()
+			
+			pointBeforeScale = QtCore.QPointF(self.mapToScene(event.pos()))
+			screenCenter = self.currentCenter
+			
+			if event.delta() > 0:
+				self._up.zoomIn()
+			else:
+				self._up.zoomOut()
+			
+			pointAfterScale = self.mapToScene(event.pos())
+			offset = pointBeforeScale - pointAfterScale
+			newCenter = screenCenter + offset
+			
+			self.setCenter(newCenter)
+
+		def setCenter(self, centerPoint):
+			visibleArea = self.mapToScene(self.rect()).boundingRect()
+			sceneBounds = self.sceneRect()
+			
+			boundX = visibleArea.width() / 2.0
+			boundY = visibleArea.height() / 2.0
+			boundWidth = sceneBounds.width() - 2.0 * boundX
+			boundHeight = sceneBounds.height() - 2.0 * boundY
+			
+			bounds = QtCore.QRectF(boundX, boundY, boundWidth, boundHeight)
+		
+			if bounds.contains(centerPoint):
+				self.currentCenter = centerPoint
+			else:
+				if visibleArea.contains(sceneBounds):
+					self.currentCenter = sceneBounds.center()
+				else:
+					self.currentCenter = centerPoint
+		
+					if centerPoint.x() > bounds.x() + bounds.width():
+						self.currentCenter.setX(bounds.x() + bounds.width())
+					elif centerPoint.x() < bounds.x():
+						self.currentCenter.setX(bounds.x())
+					
+					if centerPoint.y() > bounds.y() + bounds.height():
+						self.currentCenter.setY(bounds.y() + bounds.height())
+					elif centerPoint.y() < bounds.y():
+						self.currentCenter.setY(bounds.y())
+		
+			self.centerOn(self.currentCenter)
+		
 		
 	def load(self,image):
 		self._pm.load(image)
 		self.loadFromData(self._pm)
+
+
+	def clear(self):
+		self.ImageView.setPixmap(QtGui.QPixmap())
 
 		
 	def loadFromData(self,data):
@@ -267,6 +326,8 @@ class ImageViewer(BaseWidget,QtGui.QWidget):
 			return
 		if not self.fitToWindowAct.isChecked():
 			self.fitToWindowAct.setChecked(True)
+		if self._pm.isNull():
+			return
 		scaledSize = self._pm.size()
 		scaledSize.scale(self.ImageView.contentsRect().size(), Qt.KeepAspectRatio)
 		self.scaleFactor = (float(scaledSize.width()) / float(self._pm.size().width())) - 0.001
@@ -296,6 +357,7 @@ class ImageViewer(BaseWidget,QtGui.QWidget):
 		if not self.hasImage():
 			return
 		self.fitToWindow()
+
 
 	def hasImage(self):
 		return hasattr(self,'_pm') and not self._pm.isNull()

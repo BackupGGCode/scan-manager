@@ -9,7 +9,6 @@ import platform
 import base
 
 
-
 COMMAND_LINE_HELP = """Usage: scanmanager [--debug]
 	-d, --debug			Run in debug mode (logs detailed information to the console as well as the log file) 
 	-t, --trace		 Log detailed calls for debugging backend APIs 
@@ -21,18 +20,14 @@ def excepthook(excType, excValue, tracebackobj):
 	"""
 	global app
 	excInfo = (excType, excValue, tracebackobj)
-	text = log.logException(excInfo=excInfo)
+	text = log.logException('Unhandled exception after startup',excInfo=excInfo)
+	dialog = CrashDialog(parent=None,html='<pre>%s</pre>'%text.replace('<','&lt;').replace('>','&gt;'))
+	dialog.exec_()
 	try:
-		dialog = CrashDialog(parent=None,html='<pre>%s</pre>'%text)
-		dialog.open()
-	except:
-		pass
-	try:
-		app.close()
+		app.quit()
 	except:
 		pass
 	
-
 
 
 if __name__ == '__main__':
@@ -67,15 +62,18 @@ if __name__ == '__main__':
 		except:
 			pass
 		
-		from gui.main import App
 		from gui.dialogs import CrashDialog
+		from gui.main import App
 		import backend
 		import resources
 		
 		log.debug('opening application')
 		
 		app = App(sys.argv)
-		sys.excepthook = excepthook
+		try: 
+			import pydevd # only install the exception hook if we don't have a nice debugger handy 
+		except:
+			sys.excepthook = excepthook
 		app.exec_()
 		
 	finally:
@@ -90,6 +88,6 @@ if __name__ == '__main__':
 				try: api.close()
 				except: pass
 		try: app.settings.save()
-		except: log.logException('failed saving settings', log.ERROR)
+		except: pass
 		try: app.db.close()
 		except: pass

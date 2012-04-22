@@ -1,7 +1,6 @@
 #
 # Based on: piggyphoto.py which is Copyright (C) 2010 Alex Dumitrache
 #
-
 from ctypes import *
 
 CameraWidgetCallback = CFUNCTYPE(c_void_p, c_void_p, c_void_p)

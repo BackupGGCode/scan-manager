@@ -131,6 +131,7 @@ class DirectoryProperty(interface.CameraProperty):
 	"""
 	Class for representing an input field from into which a directory can be entered
 	"""
+	section = 'Directory'
 	
 	def __init__(self,camera):
 		self.camera = camera
@@ -172,6 +173,7 @@ class CaptureExistingProperty(interface.CameraProperty):
 	"""
 	A button that forces the camera to recapture pre-existing files 
 	"""
+	section = 'Directory'
 	
 	def __init__(self,camera):
 		self.camera = camera

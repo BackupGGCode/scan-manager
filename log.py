@@ -34,8 +34,8 @@ def configureLogging(fileLevel=DEBUG,screenLevel=WARNING):
 	handler = logging.handlers.RotatingFileHandler(
 		filename=os.path.join(smDataPath(),'scanmanager.log'),
 		mode='a',
-		maxBytes=(1024)*1024,
-		backupCount=10,
+#		maxBytes=(1024)*1024,
+#		backupCount=10,
 	)
 	handler.setLevel(DEBUG)
 	formatter = logging.Formatter('%(asctime)s %(levelname)-8s %(message)s')
@@ -122,21 +122,26 @@ class TracingWrapper(object):
 	"""
 	
 	def __init__(self,parent,prefix='',callbackStart=None,callbackEnd=None):
-		self.__dict__['parent'] = parent
-		self.__dict__['callbackStart'] = callbackStart or self.traceStart
-		self.__dict__['callbackEnd'] = callbackEnd or self.traceEnd
-		self.__dict__['prefix'] = 'trace'
+		self.__dict__['_parent'] = parent
+		self.__dict__['_callbackStart'] = callbackStart or self.traceStart
+		self.__dict__['_callbackEnd'] = callbackEnd or self.traceEnd
+		self.__dict__['_prefix'] = 'trace'
 		
 	def __getattr__(self,k):
-		v = getattr(self.parent,k)
+		v = getattr(self._parent,k)
 		if type(v) is types.MethodType:
-			return TracedCallable(self.parent,v,self.callbackStart,self.callbackEnd)
+			return TracedCallable(self._parent,v,self._callbackStart,self._callbackEnd)
 		else:
 			return v
+		
 	def __setattr__(self,k,v):
-		return setattr(self.parent,k,v)
-	def __hasattr(self,k):
-		return k in self.__dict__ or hasattr(self.parent,k)
+		return setattr(self._parent,k,v)
+	
+	def __hasattr__(self,k):
+		return k in self.__dict__ or hasattr(self._parent,k)
+	
+	def __eq__(self,x):
+		return self._parent == x
 		
 
 	def traceStart(self,parent,function,args,kargs):
@@ -148,7 +153,7 @@ class TracingWrapper(object):
 			name = parent.__class__.__name__
 		sArgs = ['%r'%i for i in args]
 		sArgs += ['%s=%r'%(k,v) for k,v in kargs.items()]
-		s = '[%s] %s.%s(%s)'%(self.prefix,name,function.__name__,','.join(sArgs))
+		s = '[%s] %s.%s(%s)'%(self._prefix,name,function.__name__,','.join(sArgs))
 		debug(s)
 		
 		
@@ -161,7 +166,7 @@ class TracingWrapper(object):
 			name = parent.__class__.__name__
 		sArgs = ['%r'%i for i in args]
 		sArgs += ['%s=%r'%(k,v) for k,v in kargs.items()]
-		s = '[%s] %s.%s(%s) -> %r'%(self.prefix,name,function.__name__,','.join(sArgs),result)
+		s = '[%s] %s.%s(%s) -> %r'%(self._prefix,name,function.__name__,','.join(sArgs),result)
 		debug(s)
 
 		

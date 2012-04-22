@@ -135,7 +135,3 @@ class CrashDialog(BaseDialog,QtGui.QDialog):
 				self._up._up.clickedContinue = True
 				self._up._up.close()
 
-	def onfinished(self):
-		if not self.clickedContinue:
-			self.app.quit()
-		

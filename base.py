@@ -121,7 +121,11 @@ def smDataPath():
 
 
 def smGetVersion():
-	return '0.4.1'
+	return '0.4.4'
+
+
+def smGetSettingsVersion():
+	return '0.4'
 
 
 class runtimeOptions(object):

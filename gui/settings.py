@@ -213,10 +213,10 @@ class SetupWindow(BaseWidget,QtGui.QWidget):
 			ob.initialiseOptions()
 	
 	def init(self):
+		self.hide()
 		self.Mode.setCurrentIndex(0)
 		self.Mode.oncurrentIndexChanged(0)
 		self.setWindowTitle(self.tr('ScanManager %s - settings')%smGetVersion())
-		self.show()
 	
 						
 	class Layout(BaseLayout,QtGui.QFormLayout):
@@ -324,7 +324,6 @@ class SetupWindow(BaseWidget,QtGui.QWidget):
 				
 				i = 3
 				progress.setValue(i)
-				
 				for camera in self.app.cameras:
 					i += 3
 					progress.setValue(i)

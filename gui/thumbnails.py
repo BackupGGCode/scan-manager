@@ -38,16 +38,17 @@ class ThumbnailItem(BaseRootInstantiable,QtGui.QWidget):
 		args=(QtGui.QBoxLayout.LeftToRight,)
 		def init(self):
 			self._up.setLayout(self)
+			self.setContentsMargins(2,2,2,2)
 
 	class Image1(BaseWidget,QtGui.QLabel):
 		def init(self):
-			self._up.Layout.addWidget(self)
 			self.setPixmap(self._up.parent().hourglass)
+			self._up.Layout.addWidget(self)
 
 	class Image2(BaseWidget,QtGui.QLabel):
 		def init(self):
-			self._up.Layout.addWidget(self)
 			self.setPixmap(self._up.parent().hourglass)
+			self._up.Layout.addWidget(self)
 		
 
 	def doDelete(self):

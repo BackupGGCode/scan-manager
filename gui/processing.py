@@ -2,9 +2,15 @@ import threading
 import Queue
 from PySide import QtGui
 import log
+import itertools
+import Queue
+
 
 
 class ProcessingJob(object):
+
+	priority = 10
+	order = 0
 	
 	def execute(self):
 		return
@@ -12,8 +18,14 @@ class ProcessingJob(object):
 	def oncompletion(self):
 		return
 
+	def __cmp__(self,other):
+		return cmp((self.priority,self.order),(other.priority,other.order))
+	
+	
 
 class PostCaptureJob(ProcessingJob):
+	
+	priority = 5
 	
 	def __init__(self,app,image,cameraIndex,pm=None):
 		self.app = app
@@ -33,8 +45,9 @@ class PostCaptureJob(ProcessingJob):
 		# cropping
 		if self.app.settings.crop.get('enabled',False):
 			qi = self.pm.toImage()
-			c = self.app.settings.crop.coords
-			qi = qi.copy(c[0],c[1],c[2]-c[0],c[3]-c[1])
+			c = self.app.settings.crop.coords[self.cameraIndex]
+			size = qi.size()
+			qi = qi.copy(c[0],c[1],max(size.width()-c[2],c[0]+1),max(size.height()-c[3],c[1]+1))
 			self.pm = QtGui.QPixmap.fromImage(qi)
 		
 		self.pm.save(self.image[self.cameraIndex].processed.getFilePath())
@@ -80,4 +93,16 @@ class ProcessingThread(threading.Thread):
 			raise
 		finally:
 			log.debug('processing thread exiting')
-			
+
+
+
+class ProcessingQueue(Queue.PriorityQueue):
+	
+	def __init__(self,maxsize=None):
+		Queue.PriorityQueue.__init__(self,maxsize=maxsize)
+		self.counter = itertools.count()
+	
+	def put(self,*args,**kargs):
+		args[0].order = self.counter.next()
+		Queue.PriorityQueue.put(self,*args,**kargs)
+		

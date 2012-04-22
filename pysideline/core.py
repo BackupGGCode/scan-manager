@@ -52,9 +52,9 @@ class BaseInstantiable(object):
 			noAutoInstantiate = False
 			
 		super(BaseInstantiable,self).__init__(*args,**kargs)
-		
+
 		if not noAutoInstantiate:
-			parent = args[0] or kargs.get('parent',None)
+			parent = (args and args[0]) or kargs.get('parent',None)
 			self._up = parent
 			toInit = self._autoInstantiate()
 			for o in toInit:
@@ -112,33 +112,10 @@ class BaseInstantiable(object):
 		"""
 		This version of _registerSubObject just passes the call up to the parent
 		"""
-		self._up._registerSubObject(k,v)
+		if self._up:
+			self._up._registerSubObject(k,v)
 
 			
-	@property
-	def app(self):
-		if isinstance(self,QtGui.QApplication):
-			return self
-		else:
-			return self._up.app
-		
-		
-	def init(self):
-		""" Placeholder for user-defined initialisation functions """
-		pass
-		
-		
-		
-class BaseWidget(BaseInstantiable):
-	"""
-	Mixin class for all PySide widgets to be used with PySideLine
-	"""	
-	
-	def __init__(self,*args,**kargs):
-		super(BaseWidget,self).__init__(*args,**kargs)
-		self._findSignals()
-		
-		
 	def _findSignals(self):
 		"""
 		Dynamically find any signals exposed by the class and keep a list of them in _signals
@@ -156,6 +133,29 @@ class BaseWidget(BaseInstantiable):
 				signalsCache[parent] = signals
 
 			self._signals.update(signalsCache[parent])
+		
+
+	@property
+	def app(self):
+		if isinstance(self,QtGui.QApplication):
+			return self
+		else:
+			return self._up.app
+		
+		
+	def init(self):
+		""" Placeholder for user-defined initialisation functions """
+		pass
+		
+
+		
+class BaseWidget(BaseInstantiable):
+	"""
+	Mixin class for all PySide widgets to be used with PySideLine
+	"""	
+	
+	pass
+		
 		
 			
 	
@@ -204,4 +204,23 @@ class BaseRootInstantiable(BaseInstantiable):
 
 
 class Application(BaseRootInstantiable,QtGui.QApplication):
-	pass
+	"""
+	A main application
+	
+	The Application class does a bit of contorsion to ensure that the init methods of all the classes get executed 
+	within the main GUI thread and after the QApplication has been initialised. This makes it easier to do startup tasks that
+	e.g. need to popup dialogue boxes etc. on failuer.  
+	"""
+	
+	def __init__(self,*args,**kargs):
+		self._subObjects = {}
+		self._up = None
+		QtGui.QApplication.__init__(self,*args,**kargs)
+		QtCore.QTimer.singleShot(0,self._on_startup)
+		
+	def _on_startup(self):
+		toInit = self._autoInstantiate()
+		for o in toInit:
+			o.init()
+		self.init()
+

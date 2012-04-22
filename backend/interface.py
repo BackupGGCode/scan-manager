@@ -7,6 +7,7 @@ ControlType.Button = 3
 ControlType.Static = 4
 ControlType.LineEdit = 5
 ControlType.Checkbox = 6
+ControlType.TwinButton = 7
 
 ImageDataFormat = Enum()
 ImageDataFormat.JPEG = 1

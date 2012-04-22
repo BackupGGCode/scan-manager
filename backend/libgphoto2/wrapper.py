@@ -46,6 +46,7 @@ class API(interface.API):
 			self.opened = True
 			self.api.open(workingDir=smDataPath(),basePath=os.path.join(smBasePath(),'backend','libgphoto2'))
 		else:
+			print 'linux '*100
 			from . import api
 			self.api = api.API()
 			self.opened = True
@@ -87,8 +88,7 @@ class Camera(interface.Camera):
 
 	def getName(self):	
 		return '%s %s'%(self.camera.getModel(),self.camera.getPort())
-		
-		
+	
 	def open(self):
 		if self.opened:
 			return
@@ -125,8 +125,7 @@ class Camera(interface.Camera):
 	
 	
 	def capture(self):
-		captured = self.camera.captureImage()
-		data = captured.getData()
+		data = self.camera.captureImage()
 		e = interface.CaptureCompleteEvent(self,data=data)
 		self.captureComplete.fire(e)
 	
@@ -160,7 +159,8 @@ class Camera(interface.Camera):
 
 
 	def stopViewfinder(self):
-		self.viewfinderThread.stopped = True
+		if self.viewfinderThread:
+			self.viewfinderThread.stopped = True
 
 
 	def configurationToCamera(self):
@@ -220,8 +220,7 @@ class ViewfinderCaptureThread(threading.Thread):
 			if self.stopped:
 				break
 			
-			previewFile = self.camera.camera.capturePreview()
-			data = previewFile.getData()
+			data = self.camera.camera.capturePreview()
 			e = interface.ViewfinderFrameEvent(self.camera,data=data)
 			self.camera.viewfinderFrame.fire(e)
 		
@@ -239,6 +238,10 @@ WidgetToControlType = {
 	constants.GP_WIDGET_MENU: interface.ControlType.Combo,
 	constants.GP_WIDGET_BUTTON: interface.ControlType.Button,
 	constants.GP_WIDGET_DATE: interface.ControlType.LineEdit, ### TODO: Add a date field
+}
+
+WidgetNameToControlType = {
+	'focuslock': interface.ControlType.TwinButton,
 }
 
 def cached(f):
@@ -265,7 +268,10 @@ class GPhotoCameraValueProperty(interface.CameraValueProperty):
 		return self.widget['name']
 
 	def getControlType(self):
-		return WidgetToControlType[self.widget['type']]
+		if self.widget['name'] in WidgetNameToControlType:
+			return WidgetNameToControlType[self.widget['name']]
+		else:
+			return WidgetToControlType[self.widget['type']]
 		
 	def getRawValue(self):
 		return self.widget['value']
@@ -337,13 +343,9 @@ class GPhotoCameraButton(GPhotoCameraValueProperty):
 	def getRawValue(self):
 		return True
 
-	#def go(self,callback=None):
-	#	if callback is None: callback = self.done
-	#	self.widget.setValue(callback)
-	
-	#def done(self,camera,widget,context):
-	#	pass
-
+	def go(self):
+		self.setRawValue(1)
+		
 
 class StartViewfinder(GPhotoCameraButton):
 	propertyId = '_START_VIEWFINDER'
@@ -356,7 +358,9 @@ class StartViewfinder(GPhotoCameraButton):
 		return self.propertyId
 	def getControlType(self):
 		return interface.ControlType.Button
-	def go(self):
+	def isReadOnly(self):
+		return not self.camera.hasViewfinder()
+	def setRawValue(self,value):
 		self.camera.startViewfinder()
 	def getSection(self):
 		return self.section
@@ -373,7 +377,9 @@ class StopViewfinder(GPhotoCameraButton):
 		return self.propertyId
 	def getControlType(self):
 		return interface.ControlType.Button
-	def go(self):
+	def isReadOnly(self):
+		return not self.camera.hasViewfinder()
+	def setRawValue(self,value):
 		self.camera.stopViewfinder()
 	def getSection(self):
 		return self.section

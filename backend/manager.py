@@ -27,6 +27,37 @@ APIState.ImportError = 4
 APIState.OpenError = 5
 
 
+class APITracingWrapper(log.TracingWrapper):
+	
+	def __init__(self,*args,**kargs):
+		
+		log.TracingWrapper.__init__(self,*args,**kargs)
+		self.__dict__['_trace_cameras'] = None
+		
+	def getCameras(self):
+		if not self._trace_cameras:
+			self.__dict__['_trace_cameras'] = [CameraTracingWrapper(i) for i in self._parent.getCameras()]
+		return self._trace_cameras
+
+
+
+class CameraTracingWrapper(log.TracingWrapper):
+	
+	def __init__(self,*args,**kargs):
+		log.TracingWrapper.__init__(self,*args,**kargs)
+		self.__dict__['_trace_properties'] = None
+		
+	def getProperties(self):
+		if not self._trace_properties:
+			self.__dict__['_trace_properties'] = [log.TracingWrapper(i) for i in self._parent.getProperties()]	
+		return self._trace_properties
+	
+	def ontimer(self):
+		""" don't log ontimer calls """
+		return self._parent.ontimer()
+
+
+
 class BackendState(object):
 	"""
 	Class for storing the state of particular backend APIs as they're being loaded and tested
@@ -85,7 +116,7 @@ class BackendManager(object):
 			try:
 				api = state.module.API(db=db)
 				if self.trace:
-					api = log.TracingWrapper(api)
+					api = APITracingWrapper(api)
 				api.open()
 			except:
 				state.error = self.formatException()

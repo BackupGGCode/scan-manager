@@ -54,25 +54,45 @@ class CameraControlFieldWidget(BaseWidget):
 			self.cameraControl = cameraControl
 			super(CameraControlFieldWidget,self).__init__(parent)
 
+
 class CameraSliderControl(AbstractCameraControl):
 
-	class Field(CameraControlFieldWidget,QtGui.QSlider):
-		def init(self):
-			self.setOrientation(Qt.Horizontal)
-		def onvalueChanged(self,raw):
-			self.cameraControl.toCamera()
+	class Field(CameraControlFieldWidget,QtGui.QWidget):
+		class Layout(BaseLayout,QtGui.QHBoxLayout):
+			def init(self):
+				self._up.setLayout(self)
+			
+		class Slider(BaseWidget,QtGui.QSlider):
+			def init(self):
+				self._up.Layout.addWidget(self,1)
+				self.setOrientation(Qt.Horizontal)
+			def onvalueChanged(self,raw):
+				self._up.cameraControl.toCamera()
 
+	
+		class Text(BaseWidget,QtGui.QLabel):
+			def init(self):
+				self._up.Layout.addWidget(self,0)
+				
+	
 	def fromCamera(self):
-		self.field.setMaximum(self.cameraProperty.getMax())
-		self.field.setMinimum(self.cameraProperty.getMin())
-		self.field.setSingleStep(self.cameraProperty.getStep())
-		self.field.setPageStep(self.cameraProperty.getStep())
+		self.field.Slider.blockSignals(True)
+		self.field.Slider.setMaximum(self.cameraProperty.getMax())
+		self.field.Slider.setMinimum(self.cameraProperty.getMin())
+		self.field.Slider.setSingleStep(self.cameraProperty.getStep())
+		self.field.Slider.setPageStep(self.cameraProperty.getStep())
 		raw = self.cameraProperty.getRawValue()
 		if raw is not None:
-			self.field.setSliderPosition(raw)
+			self.field.Slider.setSliderPosition(raw)
+		self.field.Text.setText(str(self.cameraProperty.rawToDisplay(raw)))
+		if self.cameraProperty.isReadOnly():
+			self.field.Slider.setEnabled(False)
+		else:
+			self.field.Slider.setEnabled(True)
+		self.field.Slider.blockSignals(False)
 
 	def toCamera(self):
-		raw = self.field.sliderPosition()
+		raw = self.field.Slider.sliderPosition()
 		self.processSetResult(self.cameraProperty.setRawValue(raw))
 
 
@@ -86,7 +106,7 @@ class CameraStaticControl(AbstractCameraControl):
 	def fromCamera(self):
 		raw = self.cameraProperty.getRawValue()
 		display = self.cameraProperty.rawToDisplay(raw)
-		self.field.setText(display)
+		self.field.setText(unicode(display))
 
 	def toCamera(self):
 		return
@@ -96,17 +116,20 @@ class CameraStaticControl(AbstractCameraControl):
 class CameraLineEditControl(AbstractCameraControl):
 
 	class Field(CameraControlFieldWidget,QtGui.QLineEdit):
-		def init(self):
-			if self.cameraControl.cameraProperty.isReadOnly():
-				self.setReadOnly(True)
 		def oneditingFinished(self):
 			if not self.cameraControl.cameraProperty.isReadOnly():
 				self.cameraControl.toCamera()
 
 	def fromCamera(self):
+		self.field.blockSignals(True)
 		raw = self.cameraProperty.getRawValue()
 		display = self.cameraProperty.rawToDisplay(raw)
-		self.field.setText(display)
+		self.field.setText(unicode(display))
+		if self.cameraProperty.isReadOnly():
+			self.field.setReadOnly(True)
+		else:
+			self.field.setReadOnly(False)
+		self.field.blockSignals(False)
 
 	def toCamera(self):
 		display = self.field.text()
@@ -118,15 +141,23 @@ class CameraLineEditControl(AbstractCameraControl):
 class CameraComboControl(AbstractCameraControl):
 
 	class Field(CameraControlFieldWidget,QtGui.QComboBox):
+		def init(self):
+			self.setEditable(False)
 		def onactivated(self,event):
 			self.cameraControl.toCamera()
 
 	def fromCamera(self):
+		self.field.blockSignals(True)
 		self.field.clear()
 		for raw,display in self.cameraProperty.getPossibleValues():
 			self.field.addItem(str(display),raw)
 		raw = self.cameraProperty.getRawValue()
 		self.field.setCurrentIndex(self.field.findData(raw))
+		if self.cameraProperty.isReadOnly():
+			self.field.setEnabled(False)
+		else:
+			self.field.setEnabled(True)
+		self.field.blockSignals(False)
 
 	def toCamera(self):
 		index = self.field.currentIndex()
@@ -146,6 +177,7 @@ class CameraCheckboxControl(AbstractCameraControl):
 			self.cameraControl.toCamera()
 			
 	def fromCamera(self):
+		self.field.blockSignals(True)
 		raw = self.cameraProperty.rawToDisplay(self.cameraProperty.getRawValue())
 		if raw is None:
 			self.field.setCheckState(Qt.PartiallyChecked)
@@ -153,6 +185,7 @@ class CameraCheckboxControl(AbstractCameraControl):
 			self.field.setCheckState(Qt.Checked)
 		else:
 			self.field.setCheckState(Qt.Unchecked)
+		self.field.blockSignals(False)
 		
 	def toCamera(self):
 		state = self.field.checkState()
@@ -175,11 +208,51 @@ class CameraButtonControl(AbstractCameraControl):
 			self.cameraControl.processSetResult(self.cameraControl.cameraProperty.go())
 	
 	def fromCamera(self):
-		if self.cameraProperty.getRawValue():
-			self.field.setEnabled(True)
-		else:
+		self.field.blockSignals(True)
+		if self.cameraProperty.isReadOnly():
 			self.field.setEnabled(False)
+		else:
+			self.field.setEnabled(True)
+		self.field.blockSignals(False)
+
+	def toCamera(self):
+		return
+
+
+class CameraTwinButtonControl(AbstractCameraControl):
+
+	noLabel = True
+
+	class Field(CameraControlFieldWidget,QtGui.QWidget):
+		class Layout(BaseLayout,QtGui.QHBoxLayout):
+			def init(self):
+				self._up.setLayout(self)
+			
+		class On(BaseWidget,QtGui.QPushButton):
+			def init(self):
+				self._up.Layout.addWidget(self)
+				self.setText(self._up.cameraControl.cameraProperty.getName() + self.tr(' on'))
+			def onpressed(self):
+				self._up.cameraControl.processSetResult(self._up.cameraControl.cameraProperty.setRawValue(1))
 	
+		class Off(BaseWidget,QtGui.QPushButton):
+			def init(self):
+				self._up.Layout.addWidget(self)
+				self.setText(self._up.cameraControl.cameraProperty.getName() + self.tr(' off'))
+				
+			def onpressed(self):
+				self._up.cameraControl.processSetResult(self._up.cameraControl.cameraProperty.setRawValue(0))
+	
+	def fromCamera(self):
+		self.field.blockSignals(True)
+		if self.cameraProperty.isReadOnly():
+			self.field.On.setEnabled(False)
+			self.field.Off.setEnabled(False)
+		else:
+			self.field.On.setEnabled(True)
+			self.field.Off.setEnabled(True)
+		self.field.blockSignals(False)
+
 	def toCamera(self):
 		return
 
@@ -192,6 +265,7 @@ controlTypeToClass = {
 	interface.ControlType.Static: CameraStaticControl,
 	interface.ControlType.LineEdit: CameraLineEditControl,
 	interface.ControlType.Checkbox: CameraCheckboxControl,
+	interface.ControlType.TwinButton: CameraTwinButtonControl,
 }
 
 

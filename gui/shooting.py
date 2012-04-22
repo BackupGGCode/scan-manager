@@ -88,6 +88,7 @@ class Preview(BaseWidget,QtGui.QTabWidget):
 class MainWindow(BaseWidget,QtGui.QMainWindow):
 	
 	def init(self):
+		self.hide()
 		self.setCentralWidget(self.ShootingView)
 		self.resize(900,600)
 		self.setWindowTitle(self.tr('ScanManager %s - shooting')%smGetVersion())
@@ -98,6 +99,18 @@ class MainWindow(BaseWidget,QtGui.QMainWindow):
 		self.actAbout = self.viewMenu.addAction(
 			QtGui.QAction('&About',self,triggered=self.doAbout,checkable=False)
 		)
+		
+		self.captureShortcut = QtGui.QShortcut(QtGui.QKeySequence("Ctrl+P"),self) 
+		self.captureShortcut.setContext(Qt.ApplicationShortcut)
+		self.captureShortcut.activated.connect(self.doCapture)
+
+		
+	def doCapture(self):
+		captureThreads = []
+		for camera in reversed(self.app.cameras):
+			captureThreads.append(threading.Thread(target=camera.capture))
+		for thread in captureThreads:
+			thread.start()
 
 		
 	def startShooting(self):
@@ -262,11 +275,7 @@ class MainWindow(BaseWidget,QtGui.QMainWindow):
 					self.setIconSize(QtCore.QSize(24,24))
 					
 				def onclicked(self):
-					captureThreads = []
-					for camera in reversed(self.app.cameras):
-						captureThreads.append(threading.Thread(target=camera.capture))
-					for thread in captureThreads:
-						thread.start()
+					self.app.MainWindow.doCapture()
 
 			
 	class ThumbnailDock(BaseWidget,QtGui.QDockWidget):
@@ -347,8 +356,8 @@ class MainWindow(BaseWidget,QtGui.QMainWindow):
 			pm = pm.transformed(transform)
 			
 		# correction
-		if self.app.settings.calibrators[cameraIndex] and self.app.settings.calibrators[cameraIndex].isActive():
-			pm = self.app.settings.calibrators[cameraIndex].correct(pm)
+		#if self.app.settings.calibrators[cameraIndex] and self.app.settings.calibrators[cameraIndex].isActive():
+		#	pm = self.app.settings.calibrators[cameraIndex].correct(pm)
 			
 		viewfinder.loadFromData(pm)
 
@@ -364,3 +373,16 @@ class MainWindow(BaseWidget,QtGui.QMainWindow):
 		
 		
 		
+	class Timer(BaseWidget,QtCore.QTimer):
+		
+		def init(self):
+			self.setInterval(100)
+			self.start()
+			
+		def ontimeout(self):
+			if not self._up.isVisible():
+				return
+			for camera in self.app.cameras:
+				camera.ontimer()
+
+
