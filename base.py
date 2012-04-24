@@ -7,6 +7,18 @@ Modules will usually import this early on via an "import *" to provide basic fun
 import os.path
 import platform
 
+
+def smGetVersion():
+	""" Return the current version number """
+	return '0.4.5'
+
+
+def smGetSettingsVersion():
+	""" Return the current version number for the settings file """
+	return '0.4'
+
+
+
 class NODEFAULT:
 	"""
 	Used in keyword argument lists so we can detect whether a keyword argument was supplied by doing::
@@ -118,14 +130,6 @@ def smDataPath():
 	if not os.path.exists(target):
 		os.makedirs(target)
 	return target
-
-
-def smGetVersion():
-	return '0.4.4'
-
-
-def smGetSettingsVersion():
-	return '0.4'
 
 
 class runtimeOptions(object):

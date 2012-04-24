@@ -57,21 +57,31 @@ class GPhotoClient(object):
 
 
 	def close(self):
+
+		log.debug('closing down libgphoto2 client')
 		
 		if not self.opened:
 			return
 		
+		log.debug('closing down gphotoremote.exe')
+		
 		try: 
 			self.api.stop()
 		except: 
-			log.logException('trying to stop gphotoremote.exe main loop',log.WARNING)
+			log.logException('failed trying to stop gphotoremote.exe main loop',log.WARNING)
 		
 		start = time.time()		
 		while self.process.poll() is None and (time.time()-start) < 2:
 			time.sleep(0.05)
 		if self.process.poll():			
-			log.error('failed to shut down gphotoremote.exe -- please kill the process manually using the Task Manager')
-		
+			log.warning('failed to shut down gphotoremote.exe -- trying to kill it')
+			try:
+				self.process.kill()
+			except:
+				log.logException('failed to kill gphotoremote.exe -- please kill the process manually using the Task Manager',log.ERROR)
+		else:
+			log.debug('gphotoremote.exe closed down cleanly')
+			
 		try:
 			uriPath = os.path.join(self.basePath,'uri.txt')
 			if os.path.exists(uriPath):

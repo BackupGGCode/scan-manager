@@ -46,7 +46,6 @@ class API(interface.API):
 			self.opened = True
 			self.api.open(workingDir=smDataPath(),basePath=os.path.join(smBasePath(),'backend','libgphoto2'))
 		else:
-			print 'linux '*100
 			from . import api
 			self.api = api.API()
 			self.opened = True
@@ -68,7 +67,7 @@ class API(interface.API):
 	def close(self):
 		if self.cameras:
 			for camera in self.cameras:
-				try: camera.exit()
+				try: camera.close()
 				except: pass
 		if self.opened:
 			self.api.close()
@@ -96,26 +95,29 @@ class Camera(interface.Camera):
 		self.camera.init()
 		self.properties = []
 		
-		# try to wake the camera up so we get a complete set of properties to work with
-		try:
-			imageFile = self.camera.captureImage()
-		except:
-			pass
-			
+		# fetch current camera config
 		self.configurationFromCamera()
-		for section in self.config['children']:
-			for widget in section['children']:
-				if widget['type'] == constants.GP_WIDGET_BUTTON:
-					property = GPhotoCameraButton(self,widget['name']) 
-				else: 
-					property = GPhotoCameraValueProperty(self,widget['name'])
-				property.section = section
-				self.properties.append(property)
-	
-		for property in self.api.propertyClasses:
-			self.properties.append(property(self,None))
-			
-			
+
+		# try to wake the camera up so we get a complete set of properties to work with
+		changed = False
+		if 'capture' in self.configWidgets and self.configWidgets['capture']['value'] != 1:
+			self.configWidgets['capture']['value'] = 1
+			self.configWidgets['capture']['changed'] = True
+			changed = True
+		if ('capturetarget' in self.configWidgets and 
+			self.configWidgets['capturetarget']['value'] != u'Memory card' and 
+			u'Memory card' in self.configWidgets['capturetarget']['choices']):
+			self.configWidgets['capturetarget']['value'] = u'Memory card'
+			self.configWidgets['capturetarget']['changed'] = True
+			changed = True
+		if changed:
+			self.configurationToCamera()
+			self.configurationFromCamera()
+
+		# now create new CameraProperty instances in self.properties based on the configuration we just retrieved
+		self.createProperties()
+
+
 	def hasViewfinder(self):
 		return True
 
@@ -137,6 +139,13 @@ class Camera(interface.Camera):
 	def close(self):
 		if not self.opened:
 			return
+		try:
+			if 'capture' in self.configWidgets and self.configWidgets['capture']['value'] != 0: 
+				self.configWidgets['capture']['value'] = 0
+				self.configWidgets['capture']['changed'] = True
+				self.configurationToCamera()
+		except:
+			log.logException('unable to turn off capture mode', log.WARNING)
 		self.camera.exit()
 			
 
@@ -172,7 +181,7 @@ class Camera(interface.Camera):
 				if widget['changed']:
 					toClear.append(widget)
 		if toClear:
-			s = ', '.join(['%s=%r'%(i['label'],i['value']) for i in toClear])
+			s = ', '.join(['%s (%s)=%r'%(i['name'],i['label'],i['value']) for i in toClear])
 			try:
 				self.camera.setConfiguration(self.config)
 			except:
@@ -197,14 +206,29 @@ class Camera(interface.Camera):
 					changed.append(widget)
 		
 		if changed:
-			changedString = ','.join(['%s=%r'%(i['label'],i['value']) for i in changed])
-			log.debug('Camera values changed %s'%changedString)
+			changedString = '\n        '.join(['%s (%s)=%r'%(i['name'],i['label'],i['value']) for i in changed])
+			log.debug('Camera values changed\n        %s'%changedString)
 		
 		return changed
 	
 	
 	def getWidget(self,id):
 		return self.configWidgets[id]
+	
+	
+	def createProperties(self):	
+		for section in self.config['children']:
+			for widget in section['children']:
+				if widget['type'] == constants.GP_WIDGET_BUTTON:
+					property = GPhotoCameraButton(self,widget['name']) 
+				else: 
+					property = GPhotoCameraValueProperty(self,widget['name'])
+				property.section = section
+				self.properties.append(property)
+	
+		for property in self.api.propertyClasses:
+			self.properties.append(property(self,None))
+	
 	
 	
 	

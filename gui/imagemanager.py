@@ -30,7 +30,7 @@ class ThumbnailJob(processing.ProcessingJob):
 		
 	def execute(self):
 		qi = QtGui.QImage(self.image[self.cameraIndex].raw.getFilePath())
-		qi = qi.scaled(self.size[1], self.size[0], aspectRatioMode=Qt.KeepAspectRatio,transformMode=Qt.SmoothTransformation)
+		qi = qi.scaled(self.size[0], self.size[1], aspectRatioMode=Qt.KeepAspectRatio) #,transformMode=Qt.SmoothTransformation)
 		#qi.save(self.image[self.cameraIndex].getThumbnailPath(self.size))
 		self.pm = QtGui.QPixmap(qi)
 
@@ -324,7 +324,7 @@ class CapturedImageManager(object):
 			image.rename('temp%04d.jpg'%(ndx+1))
 		for ndx,image in enumerate(changed):
 			for cameraIndex in self.cameraIndices:
-				image[cameraIndex].rename(self.calcFilename(ndx,cameraIndex=cameraIndex))
+				image[cameraIndex].rename(self.calcFilename(self.images.index(image),cameraIndex=cameraIndex))
 		
 		
 	def delete(self,fromLocation):

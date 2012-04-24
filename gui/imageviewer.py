@@ -195,6 +195,7 @@ class ImageViewer(BaseWidget,QtGui.QWidget):
 		self.Toolbar.Slider.setEnabled(False)
 		
 	class Layout(BaseLayout,QtGui.QVBoxLayout):
+		
 		def init(self):
 			self._up.setLayout(self)
 			self.setSpacing(0)
@@ -203,6 +204,7 @@ class ImageViewer(BaseWidget,QtGui.QWidget):
 			self.addWidget(self._up.Toolbar,0)
 		
 	class ImageView(BaseWidget,QtGui.QGraphicsView):
+		
 		def init(self):
 			self._scene = QtGui.QGraphicsScene()
 			self.setScene(self._scene)
@@ -330,7 +332,9 @@ class ImageViewer(BaseWidget,QtGui.QWidget):
 			return
 		scaledSize = self._pm.size()
 		scaledSize.scale(self.ImageView.contentsRect().size(), Qt.KeepAspectRatio)
-		self.scaleFactor = (float(scaledSize.width()) / float(self._pm.size().width())) - 0.001
+		scaledSize.setWidth(scaledSize.width()-10)
+		scaledSize.setHeight(scaledSize.height()-10)
+		self.scaleFactor = (float(scaledSize.width()) / float(self._pm.size().width()))
 		self.rescale()
 		self.updateSlider()
 
@@ -362,6 +366,7 @@ class ImageViewer(BaseWidget,QtGui.QWidget):
 	def hasImage(self):
 		return hasattr(self,'_pm') and not self._pm.isNull()
 
+
 	def handleFitToWindow(self):
 		if self.fitToWindowAct.isChecked():
 			self.fitToWindow()
@@ -377,6 +382,7 @@ class ImageViewer(BaseWidget,QtGui.QWidget):
 		self.Toolbar.addAction(self.zoomOutAct)
 		self.Toolbar.addAction(self.normalSizeAct)
 		self.Toolbar.addAction(self.fitToWindowAct)
+
 
 	class Toolbar(BaseWidget,QtGui.QToolBar):
 		

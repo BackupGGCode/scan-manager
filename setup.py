@@ -1,7 +1,7 @@
 import platform
 from glob import glob
 import base
-   
+
 if platform.system().lower() == 'windows':
 	from distutils.core import setup
 	import py2exe
@@ -28,19 +28,24 @@ if platform.system().lower() == 'windows':
 			# Image format plugins for PyQt4
 			('imageformats',glob('d:\Python27\Lib\site-packages\PySide\plugins\imageformats\*')),
 			#glob('d:\Python27\Lib\site-packages\PySide\qt.conf'),
+            ("Microsoft.VC90.CRT", glob(r'win32\Microsoft.VC90.CRT\*.*')),
 		],
 		options = dict(
 			py2exe = dict(
-						typelibs = [('{94A0E92D-43C0-494E-AC29-FD45948A5221}', 0, 1, 0)],
-						includes = ['PySide.QtNetwork','dumbdbm','dbhash','numpy','numpy.core','numpy.core.multiarray'],
-                        excludes = ['Tkconstants','Tkinter','tcl','tk'],
+				typelibs = [('{94A0E92D-43C0-494E-AC29-FD45948A5221}', 0, 1, 0)],
+				includes = ['PySide.QtNetwork','dumbdbm','dbhash','numpy','numpy.core','numpy.core.multiarray'],
+                excludes = ['Tkconstants','Tkinter','tcl','tk'],
+                dll_excludes = [ 'mswsock.dll', 'powrprof.dll' ],
 			),
 		),
 		#console = ('scanmanager.py',),
 		windows = [
 	       dict(
 				script = 'scanmanager.py',
-                icon_resources = [(1,'scanmanager.ico')]
+                icon_resources = [(1,'scanmanager.ico')],
 			)
 		],	
 	)
+
+
+

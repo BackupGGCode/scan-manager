@@ -93,7 +93,8 @@ class GeneralTab(CameraControlsTab):
 					self.addItem(self.tr('90 CW'),90)
 					self.addItem(self.tr('180'),180)
 					self.addItem(self.tr('90 CCW'),270)
-	
+					if self._up.getCameraIndex() in self.app.settings.rotate: 
+						self.setCurrentIndex(self.findData(self.app.settings.rotate[self._up.getCameraIndex()]))
 				def oncurrentIndexChanged(self,index):
 					angle = self.itemData(index)
 					self.app.settings.rotate[self._up.getCameraIndex()] = angle
