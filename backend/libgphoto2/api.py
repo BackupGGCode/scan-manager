@@ -582,7 +582,15 @@ class Camera(object):
 
 	def getPort(self):
 		return self.port
-
+	
+	def waitForEvent(self,timeout):
+		eventType = ctypes.c_int()
+		data = ctypes.c_char_p()
+		self.api.checkedGP.gp_camera_wait_for_event(self.c,timeout,PTR(eventType),PTR(data),self.api.context)
+		if eventType.value == GP_EVENT_TIMEOUT:
+			return eventType.value,None
+		else:
+			return eventType.value,data.value
 
 
 class CameraFile(object):

@@ -10,7 +10,7 @@ import platform
 
 def smGetVersion():
 	""" Return the current version number """
-	return '0.4.5'
+	return '0.4.6'
 
 
 def smGetSettingsVersion():

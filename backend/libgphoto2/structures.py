@@ -5,6 +5,12 @@ from ctypes import *
 
 CameraWidgetCallback = CFUNCTYPE(c_void_p, c_void_p, c_void_p)
 
+GP_EVENT_UNKNOWN = 0
+GP_EVENT_TIMEOUT = 1
+GP_EVENT_FILE_ADDED = 2    
+GP_EVENT_FOLDER_ADDED = 3 
+GP_EVENT_CAPTURE_COMPLETE = 4       
+
 
 class CameraFilePath(Structure):
 	_fields_ = [('name', (c_char * 128)),

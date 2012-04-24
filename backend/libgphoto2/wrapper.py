@@ -14,6 +14,13 @@ import constants
 import log
 
 
+GP_EVENT_UNKNOWN = 0
+GP_EVENT_TIMEOUT = 1
+GP_EVENT_FILE_ADDED = 2    
+GP_EVENT_FOLDER_ADDED = 3 
+GP_EVENT_CAPTURE_COMPLETE = 4       
+
+
 class API(interface.API):
 	""" 
 	A standard API wrapper class around the WIA API
@@ -81,6 +88,7 @@ class Camera(interface.Camera):
 		self.camera = camera
 		self.viewfinderThread = None
 		self.opened = False
+		self.afterOpened = False
 		self.config = None
 		self.configWidgets = {} 
 		
@@ -88,11 +96,13 @@ class Camera(interface.Camera):
 	def getName(self):	
 		return '%s %s'%(self.camera.getModel(),self.camera.getPort())
 	
+	
 	def open(self):
 		if self.opened:
 			return
 		self.opened = True
 		self.camera.init()
+		self.afterOpened = True
 		self.properties = []
 		
 		# fetch current camera config
@@ -103,12 +113,6 @@ class Camera(interface.Camera):
 		if 'capture' in self.configWidgets and self.configWidgets['capture']['value'] != 1:
 			self.configWidgets['capture']['value'] = 1
 			self.configWidgets['capture']['changed'] = True
-			changed = True
-		if ('capturetarget' in self.configWidgets and 
-			self.configWidgets['capturetarget']['value'] != u'Memory card' and 
-			u'Memory card' in self.configWidgets['capturetarget']['choices']):
-			self.configWidgets['capturetarget']['value'] = u'Memory card'
-			self.configWidgets['capturetarget']['changed'] = True
 			changed = True
 		if changed:
 			self.configurationToCamera()
@@ -140,6 +144,10 @@ class Camera(interface.Camera):
 		if not self.opened:
 			return
 		try:
+			self.viewfinderThread.stopped = True
+		except: 
+			pass
+		try:
 			if 'capture' in self.configWidgets and self.configWidgets['capture']['value'] != 0: 
 				self.configWidgets['capture']['value'] = 0
 				self.configWidgets['capture']['changed'] = True
@@ -154,8 +162,19 @@ class Camera(interface.Camera):
 		"""
 		If we're running in manual mode, periodically check for new items on the device, fetch them, and fire a capture event
 		"""
-		pass
-
+		if self.afterOpened:
+			eventType,data = self.camera.waitForEvent(timeout=1)
+			d = {
+				GP_EVENT_UNKNOWN: 'GP_EVENT_UNKNOWN',
+				GP_EVENT_TIMEOUT: 'GP_EVENT_TIMEOUT',
+				GP_EVENT_FILE_ADDED: 'GP_EVENT_FILE_ADDED',    
+				GP_EVENT_FOLDER_ADDED: 'GP_EVENT_FOLDER_ADDED', 
+				GP_EVENT_CAPTURE_COMPLETE: 'GP_EVENT_CAPTURE_COMPLETE',
+			}
+			if eventType == GP_EVENT_TIMEOUT:
+				return
+			print d[eventType],data
+		
 	#
 	# Non-interface
 	#
