@@ -89,11 +89,14 @@ class Camera(interface.Camera):
 	
 	def ontimer(self):
 		"""
-		Periodically check for new files in the device directory, fetch them, and fire a capture event
+		Periodically check for new files in the device directory, fetch them, and emit a capture event
 		"""
 		if self.settings.directory:
 			self.captureNewImages()
-			
+
+	#
+	# Non-interface
+	#
 
 	def ignoreExisting(self):
 		if self.settings.directory and os.path.isdir(self.settings.directory):
@@ -108,7 +111,7 @@ class Camera(interface.Camera):
 	
 	def captureNewImages(self):
 		"""
-		Search the directory for new items and fire a captureComplete event for each new item
+		Search the directory for new items and emit a captureComplete event for each new item
 		
 		@return: None
 		"""
@@ -123,7 +126,7 @@ class Camera(interface.Camera):
 			filename = os.path.join(self.settings.directory,name)
 			data = open(filename,'rb').read()
 			e = interface.CaptureCompleteEvent(self,data)
-			self.captureComplete.fire(e)
+			self.captureComplete.emit(e)
 			
 
 
@@ -134,6 +137,7 @@ class DirectoryProperty(interface.CameraProperty):
 	section = 'Directory'
 	
 	def __init__(self,camera):
+		super(DirectoryProperty,self).__init__()
 		self.camera = camera
 		
 	def getName(self):
@@ -176,6 +180,7 @@ class CaptureExistingProperty(interface.CameraProperty):
 	section = 'Directory'
 	
 	def __init__(self,camera):
+		super(CaptureExistingProperty,self).__init__()
 		self.camera = camera
 		
 	def getName(self):

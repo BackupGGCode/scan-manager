@@ -107,18 +107,19 @@ class Camera(interface.Camera):
 
 	def handleViewfinderData(self,data):
 		e = interface.ViewfinderFrameEvent(self,data=data)
-		self.viewfinderFrame.fire(e)
+		self.viewfinderFrame.emit(e)
 		
 		
 	def handleCaptureComplete(self,releaseInfo):
 		e = interface.CaptureCompleteEvent(self,releaseInfo.imageBuffer)
-		self.captureComplete.fire(e)
+		self.captureComplete.emit(e)
 
 
 
 class PSRECCameraValueProperty(interface.CameraValueProperty):
 	
 	def __init__(self,camera):
+		super(PSRECCameraValueProperty,self).__init__()
 		self.camera = camera
 		self.sdkCamera = camera.camera
 		
@@ -203,6 +204,7 @@ class PSRECCameraValueProperty(interface.CameraValueProperty):
 class PSRECCameraButton(interface.CameraValueProperty):
 
 	def __init__(self,camera):
+		super(PSRECCameraButton,self).__init__()
 		self.camera = camera
 		self.sdkCamera = camera.camera
 	

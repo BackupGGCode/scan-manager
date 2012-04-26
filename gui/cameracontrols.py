@@ -4,7 +4,6 @@ from PySide import QtCore
 from PySide.QtCore import Qt
 from backend import interface
 
-
 class AbstractCameraControl(object):
 	
 	noLabel = False
@@ -48,6 +47,7 @@ class AbstractCameraControl(object):
 		else:
 			### TODO: do something with this error string
 			pass
+
 
 class CameraControlFieldWidget(BaseWidget):
 		def __init__(self,parent,cameraControl):
@@ -178,10 +178,11 @@ class CameraCheckboxControl(AbstractCameraControl):
 			
 	def fromCamera(self):
 		self.field.blockSignals(True)
-		raw = self.cameraProperty.rawToDisplay(self.cameraProperty.getRawValue())
-		if raw is None:
+		raw = self.cameraProperty.getRawValue()
+		display = self.cameraProperty.rawToDisplay(self.cameraProperty.getRawValue())
+		if display is None:
 			self.field.setCheckState(Qt.PartiallyChecked)
-		elif raw:
+		elif display:
 			self.field.setCheckState(Qt.Checked)
 		else:
 			self.field.setCheckState(Qt.Unchecked)

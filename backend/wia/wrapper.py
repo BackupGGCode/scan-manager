@@ -207,6 +207,7 @@ class WIACameraValueProperty(interface.CameraValueProperty):
 	dRawToDisplay = None #: A simple mapping of raw value -> displayable string for this property
 	
 	def __init__(self,camera):
+		super(WIACameraValueProperty,self).__init__()
 		self.camera = camera
 		self.sdkCamera = camera.camera
 		

@@ -11,6 +11,30 @@ import threading
 
 
 
+class CaptureThread(threading.Thread):
+	
+	def __init__(self,camera):
+		threading.Thread.__init__(self)
+		self.camera = camera
+
+	
+	def run(self):
+		try:
+			if self.camera.hasViewfinder():
+				self.camera.stopViewfinder()
+		except:
+			log.logException('failed to stop viewfinder before capture', log.WARNING)
+			
+		self.camera.capture()
+		
+		try:
+			if self.camera.hasViewfinder():
+				self.camera.startViewfinder()
+		except:
+			log.logException('failed to re-start viewfinder after capture', log.WARNING)
+
+
+
 class LiveView(BaseWidget,QtGui.QLabel):
 	""" Widget to display camera viewfinder live view """
 	
@@ -108,7 +132,9 @@ class MainWindow(BaseWidget,QtGui.QMainWindow):
 	def doCapture(self):
 		captureThreads = []
 		for camera in reversed(self.app.cameras):
-			captureThreads.append(threading.Thread(target=camera.capture))
+			captureThreads.append(
+				CaptureThread(camera)
+			)
 		for thread in captureThreads:
 			thread.start()
 
@@ -313,6 +339,7 @@ class MainWindow(BaseWidget,QtGui.QMainWindow):
 
 	def captureCompleteCallback(self,event):
 		# we have to do this via a signal because you can't have a non-gui thread doing gui stuff in Qt (this mainly affects PS-ReC drivers)
+		# TODO: this may not be necessary now the interface uses QT signals
 		self.captureComplete.emit(event)
 
 		
@@ -384,5 +411,4 @@ class MainWindow(BaseWidget,QtGui.QMainWindow):
 				return
 			for camera in self.app.cameras:
 				camera.ontimer()
-
 

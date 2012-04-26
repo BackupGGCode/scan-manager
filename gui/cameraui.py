@@ -260,9 +260,3 @@ class GeneralTab(CameraControlsTab):
 					ndx = self._up.getCameraIndex()
 					image = self.app.imageManager.selected
 					self.app.processingQueue.put(processing.PostCaptureJob(self.app,image,ndx))
-	
-	
-
-		
-			
-			

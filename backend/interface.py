@@ -1,5 +1,7 @@
 from base import Enum, BaseSettings
 
+from PySide.QtCore import Signal, QObject
+
 ControlType = Enum()
 ControlType.Combo = 1
 ControlType.Slider = 2
@@ -170,37 +172,17 @@ class CaptureCompleteEvent(CameraEvent):
 
 
 
-class PropertyChangeEvent(CameraEvent):
-	def __init__(self,camera,propertyId,newValue):
-		self.camera = camera
-		self.propertyId = propertyId
-		self.newValue = newValue
-
-		
-	@abstract
-	def getProperty(self):
-		""" 
-		@return: L{CameraProperty}
-		"""
-		
-	@abstract
-	def geValueBefore(self):
-		""" Get the value as it was before the change """
-		
-	@abstract
-	def geValueAfter(self):
-		""" Get the value as it was before the change """
-
-
-
 class CameraSignal(object):
+	"""
+	To be used in case we're using these wrappers outside a Qt application and can't use Qt's Signal handling
+	"""
 	
-	def __init__(self,ident):
-		self.ident = ident
+	def __init__(self,*args):
+		self.types = args
 		self.listeners = []
 		
 		
-	def fire(self,event):
+	def emit(self,event):
 		""" fire a given event off to anyone listening at this signal """
 		for f in self.listeners:
 			f(event)
@@ -219,17 +201,16 @@ class CameraSignal(object):
 	
 
 
-class Camera(object):
+class Camera(QObject):
 	""" Generic interface for cameras """
 
+	viewfinderFrame = Signal(object)
+	captureComplete = Signal(object)
 	
 	def __init__(self,api):
+		super(Camera,self).__init__()
 		self.api = api
-		self.viewfinderFrame = CameraSignal('viewfinderFrame')
-		self.captureComplete = CameraSignal('captureComplete')
-		self.propertyChange = CameraSignal('propertyChange')
 		
-	
 	@abstract
 	def open(self):
 		""" 
@@ -292,12 +273,13 @@ class Camera(object):
 	def settings(self):
 		if self.getName() not in self.api.settings.cameraSettings:
 			self.api.settings.cameraSettings[self.getName()] = CameraSettings()
-		return self.api.settings.cameraSettings[self.getName()]
-	
+		return self.api.settings.cameraSettings[self.getName()]	
 	
 
-class CameraProperty(object):
+
+class CameraProperty(QObject):
 	""" Generic interface for cameras """
+	
 	section = 'General'
 	
 	@abstract

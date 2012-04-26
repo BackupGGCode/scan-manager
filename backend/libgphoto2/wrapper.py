@@ -12,13 +12,21 @@ import platform
 import threading
 import constants
 import log
-
+import re
 
 GP_EVENT_UNKNOWN = 0
 GP_EVENT_TIMEOUT = 1
 GP_EVENT_FILE_ADDED = 2    
 GP_EVENT_FOLDER_ADDED = 3 
 GP_EVENT_CAPTURE_COMPLETE = 4       
+
+EVENTTYPE_TO_NAME = {
+	GP_EVENT_UNKNOWN: 'GP_EVENT_UNKNOWN',
+	GP_EVENT_TIMEOUT: 'GP_EVENT_TIMEOUT',
+	GP_EVENT_FILE_ADDED: 'GP_EVENT_FILE_ADDED',    
+	GP_EVENT_FOLDER_ADDED: 'GP_EVENT_FOLDER_ADDED', 
+	GP_EVENT_CAPTURE_COMPLETE: 'GP_EVENT_CAPTURE_COMPLETE',
+}
 
 
 class API(interface.API):
@@ -104,6 +112,7 @@ class Camera(interface.Camera):
 		self.camera.init()
 		self.afterOpened = True
 		self.properties = []
+		self.nameToProperty = {}
 		
 		# fetch current camera config
 		self.configurationFromCamera()
@@ -133,7 +142,7 @@ class Camera(interface.Camera):
 	def capture(self):
 		data = self.camera.captureImage()
 		e = interface.CaptureCompleteEvent(self,data=data)
-		self.captureComplete.fire(e)
+		self.captureComplete.emit(e)
 	
 	
 	def getProperties(self):
@@ -156,25 +165,20 @@ class Camera(interface.Camera):
 			log.logException('unable to turn off capture mode', log.WARNING)
 		self.camera.exit()
 			
-
 	
 	def ontimer(self):
 		"""
-		If we're running in manual mode, periodically check for new items on the device, fetch them, and fire a capture event
+		If we're running in manual mode, periodically check for new items on the device, fetch them, and emit a capture event
 		"""
+		
 		if self.afterOpened:
-			eventType,data = self.camera.waitForEvent(timeout=1)
-			d = {
-				GP_EVENT_UNKNOWN: 'GP_EVENT_UNKNOWN',
-				GP_EVENT_TIMEOUT: 'GP_EVENT_TIMEOUT',
-				GP_EVENT_FILE_ADDED: 'GP_EVENT_FILE_ADDED',    
-				GP_EVENT_FOLDER_ADDED: 'GP_EVENT_FOLDER_ADDED', 
-				GP_EVENT_CAPTURE_COMPLETE: 'GP_EVENT_CAPTURE_COMPLETE',
-			}
+			eventType,data = self.camera.waitForEvent(timeout=0)
 			if eventType == GP_EVENT_TIMEOUT:
 				return
-			print d[eventType],data
-		
+			log.debug('%s %r'%(EVENTTYPE_TO_NAME[eventType],data))
+			if eventType == GP_EVENT_UNKNOWN and data.startswith('PTP Property'):
+				self.configurationFromCamera()
+				
 	#
 	# Non-interface
 	#
@@ -235,7 +239,8 @@ class Camera(interface.Camera):
 		return self.configWidgets[id]
 	
 	
-	def createProperties(self):	
+	def createProperties(self):
+		self.nameToProperty = {}	
 		for section in self.config['children']:
 			for widget in section['children']:
 				if widget['type'] == constants.GP_WIDGET_BUTTON:
@@ -244,10 +249,14 @@ class Camera(interface.Camera):
 					property = GPhotoCameraValueProperty(self,widget['name'])
 				property.section = section
 				self.properties.append(property)
+				self.nameToProperty[widget['name']] = property
 	
 		for property in self.api.propertyClasses:
 			self.properties.append(property(self,None))
 	
+	
+	def getPropertyByName(self,name):
+		return self.nameToProperty[name]
 	
 	
 	
@@ -265,7 +274,7 @@ class ViewfinderCaptureThread(threading.Thread):
 			
 			data = self.camera.camera.capturePreview()
 			e = interface.ViewfinderFrameEvent(self.camera,data=data)
-			self.camera.viewfinderFrame.fire(e)
+			self.camera.viewfinderFrame.emit(e)
 		
 	def stop(self):
 		self.stopped = True
@@ -301,6 +310,7 @@ def cached(f):
 class GPhotoCameraValueProperty(interface.CameraValueProperty):
 	
 	def __init__(self,camera,widgetId):
+		super(GPhotoCameraValueProperty,self).__init__()
 		self.camera = camera
 		self.widgetId = widgetId
 
@@ -388,6 +398,7 @@ class GPhotoCameraButton(GPhotoCameraValueProperty):
 
 	def go(self):
 		self.setRawValue(1)
+		self.camera.configurationFromCamera()
 		
 
 class StartViewfinder(GPhotoCameraButton):
@@ -427,6 +438,5 @@ class StopViewfinder(GPhotoCameraButton):
 	def getSection(self):
 		return self.section
 		
-
 
 API.propertyClasses = [StartViewfinder,StopViewfinder]

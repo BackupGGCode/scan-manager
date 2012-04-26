@@ -9,6 +9,7 @@ Similarly signals, instead of needing to be connected procedurally using .connec
 from PySide import QtCore
 from PySide import QtGui
 import itertools
+import sys
 
 __all__ = ['signalsCache','BaseInstantiable','BaseWidget','BaseLayout','BaseDialog','BaseRootInstantiable','Application']
 
@@ -35,6 +36,26 @@ class CounterMetaclass(type(QtCore.QObject)):
 ### 3.0		
 #class BaseInstantiable(metaclass=CounterMetaclass):
 
+
+
+class Acquisition(object):
+	
+	def __init__(self,base):
+		self.base = base
+	
+	def __getattr__(self,k):
+		o = self.base
+		while 1:
+			if hasattr(self.base,k):
+				return getattr(self.base,k)
+			if hasattr(o,'_up') and o._up is not None:
+				o = o._up
+			else:
+				ei = sys.exc_info()
+				raise ei[0],None,ei[2].tb_next 
+
+
+
 class BaseInstantiable(object):
 	"""
 	Base class for all objects that should be auto-instantiated
@@ -45,6 +66,9 @@ class BaseInstantiable(object):
 	__metaclass__ = CounterMetaclass
 
 	def __init__(self,*args,**kargs):
+		
+		self.aq = Acquisition(self)
+		
 		if 'noAutoInstantiate' in kargs:
 			noAutoInstantiate = kargs['noAutoInstantiate']
 			del(kargs['noAutoInstantiate'])

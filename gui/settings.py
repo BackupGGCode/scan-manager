@@ -403,7 +403,7 @@ class SetupWindow(BaseWidget,QtGui.QWidget):
 		if data.mode == Mode.V:
 			data.cameraL = cameraFromName(data.cameraL)
 			data.cameraR = cameraFromName(data.cameraR)
-		else:
+		else:	
 			data.cameraC = cameraFromName(data.cameraC)
 		self.toForm(data)
 
