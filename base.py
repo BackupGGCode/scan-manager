@@ -53,6 +53,26 @@ class Enum(object):
 
 
 
+class Flags(object):
+	
+	def __iter__(self):
+		for k,v in self.__dict__.items():
+			yield (k,v)
+	
+	
+	def __getitem__(self,i):
+		for k,v in self.__dict__.items():
+			if v == i:
+				return k
+		else:
+			raise KeyError(i)
+
+
+	def pp(self,flags):
+		return '|'.join([k for k,v in self if v&flags])
+
+
+
 class BaseSettings(object):
 	def __init__(self,**kargs):
 		self.__dict__.update(kargs)

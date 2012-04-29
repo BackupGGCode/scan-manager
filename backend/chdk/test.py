@@ -4,11 +4,12 @@
 import sys
 import traceback
 from PtpUsbTransport import PtpUsbTransport
-from PtpSession import PtpCHDKSession, PtpException
+from PtpSession import PtpException
+import PtpCHDK
 import PtpValues
 
 ptpTransport = PtpUsbTransport(PtpUsbTransport.findptps()[0])
-ptpSession = PtpCHDKSession(ptpTransport)
+ptpSession = PtpCHDK.PtpCHDKSession(ptpTransport)
 
 vendorId = PtpValues.Vendors.STANDARD
 
@@ -16,44 +17,38 @@ ptpSession.OpenSession()
 deviceInfo = ptpSession.GetDeviceInfo()
 vendorId = deviceInfo.VendorExtensionID
 
-id = 0
+import ctypes
+
+	
 try:
 	version = ptpSession.GetVersion()
 	print 'version',version
-	rc = ptpSession.Upload('A/CHDK/SCRIPTS/testme.lua','''
-print( "hello world" )
-''')
+
+	scriptId,rc = ptpSession.ExecuteScript('switch_mode_usb(1)')
+	print 'execute loadfile',scriptId,rc
+	rc = ptpSession.GetScriptStatus(scriptId=scriptId)
+	print 'get status %d %s'%(rc,PtpCHDK.ScriptStatusFlag.pp(rc))
+	
+	#frame = ptpSession.GetLiveData()
+	#print 'live data',frame
+
+	rc = ptpSession.Upload('A/CHDK/SCRIPTS/testme.lua','''print( "hello world" )''')
 	print 'upload',rc
 	rc = ptpSession.Download('A/CHDK/SCRIPTS/testme.lua')
 	print 'download',rc
 	scriptId,rc = ptpSession.ExecuteScript('loadfile("A/CHDK/SCRIPTS/testme.lua")')
-	print 'execute',scriptId,rc
+	print 'execute loadfile',scriptId,rc
 	rc = ptpSession.GetScriptStatus(scriptId=scriptId)
-	print 'get status',rc
+	print 'get status %d %s'%(rc,PtpCHDK.ScriptStatusFlag.pp(rc))
+	
 	scriptId,rc = ptpSession.ExecuteScript('print("hello world 2")')
 	print 'execute',scriptId,rc
 	rc = ptpSession.GetScriptStatus(scriptId=scriptId)
-	print 'get status',rc
+	print 'get status %d %s'%(rc,PtpCHDK.ScriptStatusFlag.pp(rc))
+		
 	rc = ptpSession.ReadScriptMessage(scriptId=scriptId)
 	print 'read message',rc
-	
-	"""
-	objectid = None
-	while True:
-		evt = ptpSession.CheckForEvent(None)
-		if evt == None:
-			raise Exception("Capture did not complete")
-		if evt.eventcode == PtpValues.StandardEvents.OBJECT_ADDED:
-			objectid = evt.params[0]
 
-	if objectid != None:
-		file = open("capture_%i.jpg" % id, "w")
-		ptpSession.GetObject(objectid, file)
-		file.close()
-		id+=1
-		ptpSession.DeleteObject(objectid)
-	"""
-	
 except PtpException, e:
 	print "PTP Exception: %s" % PtpValues.ResponseNameById(e.responsecode, vendorId)
 	raise
