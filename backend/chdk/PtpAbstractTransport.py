@@ -1,4 +1,5 @@
-# -*- coding: utf-8 -*-
+# Based on code from the pyptp project (http://code.google.com/p/pyptp/) 
+
 import struct
 
 
