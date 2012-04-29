@@ -1,9 +1,13 @@
 from distutils.core import setup, Extension
 
-module1 = Extension('demo',
-                    sources = ['demo.c'])
-
-setup (name = 'PackageName',
-       version = '1.0',
-       description = 'This is a demo package',
-       ext_modules = [module1])
+setup(
+    name = 'chdkimage',
+    version = '1.0',
+    description = 'CHDK Live View image post-processing',
+    ext_modules = [
+        Extension(
+            'chdkimage',
+            sources = ['chdkimage.c'],
+        ),
+    ],
+)
