@@ -5,6 +5,7 @@ import PtpValues
 
 import ctypes
 
+import chdkimage
 
 class Enum(object):
 	
@@ -162,56 +163,22 @@ class LiveDataHeader(ctypes.Structure):
 				s += indent + '  %s: %r\n'%(k,v)
 		return s
 
-import numpy
+import Image
 
 class LiveViewFrame(object):
-	"""
-	This class is far from complete
-	
-	Still to do:
-	
-	Convert the YUVA/YUV palettes into RGBA palettes and use these to transform the image data to RGB. This will replicate the work of liveimg.c in chdkptp.
-	
-	The best way to handle this may be to make liveimg.c into a Python extension (removing all the LUA stuff and including
-	just a simple function that takes the address of frame data as returned from the camera and returns a pair of RGBA strings
-	which we can pass to PIL/OpenCV/Qt.
-	"""
-	
 	
 	def __init__(self,raw):
+		self.viewport = None
+		self.bitmap = None
+		
 		headerBuffer = ctypes.create_string_buffer(raw[:ctypes.sizeof(LiveDataHeader)])
 		header = LiveDataHeader.from_buffer(headerBuffer)
-		print header.pp()
-		if header.palette_data_start:
-			paletteData = raw[header.palette_data_start:header.viewport.data_start]
-		else:
-			paletteData = '\x00\x00\x00\x00\xff\xe0\x00\x00\xff`\xeeb\xff\xb9\x00\x00\x7f\x00\x00\x00\xff~\xa1\xb3\xff\xcc\xb8^\xff_\x00\x00\xff\x94\xc5]\xff\x8aP\xb0\xffK=\xd4\x7f(\x00\x00\x7f\x00{\xe2\xff0\x00\x00\xffi\x00\x00\xff\x00\x00\x00'
-		palette = numpy.fromstring(paletteData,numpy.int8)
-		rgbPalette = yuv2rgb(palette)
 		
-		if header.viewport.data_start:
-			vpData = raw[header.viewport.data_start:header.bitmap.data_start]
-			print 'vp:',len(vpData),float(len(vpData))/header.viewport.logical_width
-			vp = numpy.fromstring(vpData,numpy.uint8)
-			vp = vp.reshape(header.viewport.logical_width,-1)
-			print vp[:10]
-		if header.bitmap.data_start:
-			bmData = raw[header.bitmap.data_start:]
-			print 'bp:',len(bmData),float(len(bmData))/header.bitmap.logical_width
-			bm = numpy.fromstring(bmData,numpy.uint8)
-			bm = bm.reshape(header.bitmap.logical_width,-1)
-			print bm[:10]
-			
-		print 'len vp: %d',len(vpData),
-		print 'len bm: %d',len(bmData)
+		viewportRGB = chdkimage.dataToViewportRGB(raw,0)
+		self.viewport = Image.fromstring("RGB",(header.bitmap.logical_width,header.bitmap.logical_height),viewportRGB,'raw','RGB')
 		
-		import Image
-		image = Image.fromstring("L",(header.bitmap.logical_width,header.bitmap.logical_height),bmData,'raw','L')
-		image.save(r'd:\temp\test-bm.jpg')
-
-		image = Image.fromstring("RGB",(header.bitmap.logical_width,header.bitmap.logical_height),vpData,'raw','RGB')
-		image.save(r'd:\temp\test-vp.jpg')
-		
+		bitmapRGBA = chdkimage.dataToBitmapRGBA(raw,0)
+		self.bitmap = Image.fromstring("RGBA",(header.bitmap.logical_width,header.bitmap.logical_height),bitmapRGBA,'raw','RGBA')
 
 
 class ScriptMessage(object):

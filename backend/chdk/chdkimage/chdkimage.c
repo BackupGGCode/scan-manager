@@ -1,3 +1,4 @@
+#include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
 #include "live_view.h"
@@ -180,25 +181,27 @@ void yuv_live_to_cd_rgb(const char *p_yuv,
 	unsigned row_inc = (buf_width*12)/8;
 	const char *p;
 	// start at end to flip for CD
-	const char *p_row = p_yuv + (height + y_offset - 1) * row_inc + (x_offset*12)/8;
-	for(row=0;row<height;row++,p_row -= row_inc) {
+	const char *p_row = p_yuv + (y_offset - 1) * row_inc + (x_offset*12)/8;
+	for(row=0;row<height;row++,p_row += row_inc) {
 		for(x=0,p=p_row;x<width;x+=4,p+=6) {
-			*r++ = yuv_to_r(p[1],p[2]);
-			*g++ = yuv_to_g(p[1],p[0],p[2]);
-			*b++ = yuv_to_b(p[1],p[0]);
+			*r = yuv_to_r(p[1],p[2]);
+			*g = yuv_to_g(p[1],p[0],p[2]);
+			*b = yuv_to_b(p[1],p[0]);
 
-			*r++ = yuv_to_r(p[3],p[2]);
-			*g++ = yuv_to_g(p[3],p[0],p[2]);
-			*b++ = yuv_to_b(p[3],p[0]);
+			*r = yuv_to_r(p[3],p[2]);
+			*g = yuv_to_g(p[3],p[0],p[2]);
+			*b = yuv_to_b(p[3],p[0]);
+			r+=3;g+=3;b+=3;
 			if(!skip) {
 				// TODO it might be better to use the next pixels U and V values
-				*r++ = yuv_to_r(p[4],p[2]);
-				*g++ = yuv_to_g(p[4],p[0],p[2]);
-				*b++ = yuv_to_b(p[4],p[0]);
+				*r = yuv_to_r(p[4],p[2]);
+				*g = yuv_to_g(p[4],p[0],p[2]);
+				*b = yuv_to_b(p[4],p[0]);
 
-				*r++ = yuv_to_r(p[5],p[2]);
-				*g++ = yuv_to_g(p[5],p[0],p[2]);
-				*b++ = yuv_to_b(p[5],p[0]);
+				*r = yuv_to_r(p[5],p[2]);
+				*g = yuv_to_g(p[5],p[0],p[2]);
+				*b = yuv_to_b(p[5],p[0]);
+				r+=3;g+=3;b+=3;
 			}
 		}
 	}
@@ -253,7 +256,7 @@ static PyObject *dataToViewportRGB(PyObject *self, PyObject *args) {
 	uint8_t * out;
 	PyObject *rc;
 
-	if(!PyArg_ParseTuple(args,"s#i",frame,&length,&skip)) {
+	if(!PyArg_ParseTuple(args,"s#i",&frame,&length,&skip)) {
 		return NULL;
 	}
 
@@ -290,7 +293,7 @@ static PyObject *dataToViewportRGB(PyObject *self, PyObject *args) {
 		frame->vp.visible_width,
 		frame->vp.visible_height,
 		skip,
-		out, out+outLen, out+(outLen*2)
+		out, out+1, out+2
 	);
 
 	rc = PyString_FromStringAndSize(out,outLen*3);
@@ -321,8 +324,9 @@ PyObject *dataToBitmapRGBA(PyObject *self, PyObject *args) {
 	int outLen;
 	uint8_t *out;
 	PyObject *rc;
+	palette_entry_rgba_t *c;
 
-	if(!PyArg_ParseTuple(args,"s#i",frame,&length,&skip)) {
+	if(!PyArg_ParseTuple(args,"s#i",&frame,&length,&skip)) {
 		return NULL;
 	}
 
@@ -355,28 +359,29 @@ PyObject *dataToBitmapRGBA(PyObject *self, PyObject *args) {
 	vwidth = frame->bm.visible_width/par;
 	dispsize = vwidth*frame->bm.visible_height;
 
-	outLen = dispsize;
+	outLen = frame->vp.visible_width * frame->vp.visible_height;
 	out = (uint8_t *) malloc(outLen*4);
 
 	y_inc = frame->bm.buffer_width;
 	x_inc = par;
 	height = frame->bm.visible_height;
 
-	p=((uint8_t *)length + frame->bm.data_start) + (height-1)*y_inc;
+	p=((uint8_t *)frame + frame->bm.data_start);
 
 	r = out;
-	g = out + (outLen*1);
-	b = out + (outLen*2);
-	a = out + (outLen*3);
+	g = out + 1;
+	b = out + 2;
+	a = out + 3;
 
 	// TODO we don't actually check the various offsets
-	for(y=0;y<height;y++,p-=y_inc) {
+	for(y=0;y<height;y++,p+=y_inc) {
 		for(x=0;x<frame->bm.visible_width;x+=x_inc) {
-			palette_entry_rgba_t *c =&pal_rgba[*(p+x)];
-			*r++ = c->r;
-			*g++ = c->g;
-			*b++ = c->b;
-			*a++ = c->a;
+			c = &pal_rgba[*(p+x)];
+			*r = c->r;
+			*g = c->g;
+			*b = c->b;
+			*a = c->a;
+			r+=4;g+=4;b+=4;a+=4;
 		}
 	}
 

@@ -7,6 +7,7 @@ from PtpUsbTransport import PtpUsbTransport
 from PtpSession import PtpException
 import PtpCHDK
 import PtpValues
+import time
 
 ptpTransport = PtpUsbTransport(PtpUsbTransport.findptps()[0])
 ptpSession = PtpCHDK.PtpCHDKSession(ptpTransport)
@@ -29,8 +30,11 @@ try:
 	rc = ptpSession.GetScriptStatus(scriptId=scriptId)
 	print 'get status %d %s'%(rc,PtpCHDK.ScriptStatusFlag.pp(rc))
 	
-	#frame = ptpSession.GetLiveData()
-	#print 'live data',frame
+	t = time.time()
+	frame = ptpSession.GetLiveData()
+	frame.liveview.save(r'd:\temp\test-bm.png')
+	frame.bitmap.save(r'd:\temp\test-vp.jpg')
+	print 'live data',frame
 
 	rc = ptpSession.Upload('A/CHDK/SCRIPTS/testme.lua','''print( "hello world" )''')
 	print 'upload',rc
