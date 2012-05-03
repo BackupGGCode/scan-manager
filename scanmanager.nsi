@@ -1,6 +1,6 @@
 
-Name "ScanManager 0.4.6"
-OutFile "scanmanager-setup-windows-x86-0.4.6.exe"
+Name "ScanManager 0.4.7"
+OutFile "scanmanager-setup-windows-x86-0.4.7.exe"
 InstallDir "$PROGRAMFILES\ScanManager"
 InstallDirRegKey HKLM "Software\ScanManager" "Install_Dir"
 RequestExecutionLevel admin
@@ -246,7 +246,7 @@ Section "ScanManager (required)"
     ; Create an uninstaller
     WriteUninstaller "uninstall.exe"
 
-    WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\ScanManager" "DisplayName" "ScanManager Camera Control 0.4.6"
+    WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\ScanManager" "DisplayName" "ScanManager Camera Control 0.4.7"
     WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\ScanManager" "UninstallString" "$\"$INSTDIR\uninstall.exe$\""    
     WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\ScanManager" "QuietUninstallString" "$\"$INSTDIR\uninstall.exe$\" /S"
     
