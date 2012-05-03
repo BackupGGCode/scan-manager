@@ -120,6 +120,10 @@ class Camera(interface.Camera):
 		return False
 
 
+	def isViewfinderStarted(self):
+		return False 
+
+
 	def hasCapture(self):
 		return self.mode == WIAAPIMode.Tethered
 	

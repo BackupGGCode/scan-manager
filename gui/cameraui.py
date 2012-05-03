@@ -16,7 +16,7 @@ class CameraControls(BaseWidget,QtGui.QTabWidget):
 
 	def setup(self,camera):
 		self.camera = camera
-		self.controls = []
+		self.controls = {}
 		self.tabs = {}
 
 		tab = GeneralTab(self)
@@ -35,15 +35,24 @@ class CameraControls(BaseWidget,QtGui.QTabWidget):
 			tab = self.tabs[section]
 			cls = cameracontrols.controlTypeToClass[property.getControlType()]
 			control = cls(qtparent=tab.CameraControlsTabScroll.CameraControlsTabMainArea,cameraProperty=property)
-			self.controls.append(control)
+			self.controls[property] = control
 
 		self.refreshFromCamera()
 		
 		for tab in self.tabs.values():
 			tab.CameraControlsTabScroll.CameraControlsTabMainArea.adjustSize()
+			
+		self.camera.propertiesChanged.connect(self.onProperiesChanged)
 		
+		
+	def onProperiesChanged(self,event):
+		properties = event.getProperties()
+		for property in properties:
+			self.controls[property].fromCamera()
+			
+
 	def refreshFromCamera(self):
-		for control in self.controls:
+		for control in self.controls.values():
 			control.fromCamera()
 
 

@@ -8,30 +8,53 @@ from .cameraui import CameraControls
 import log
 
 import threading
+import Queue
+import time
 
 
 
 class CaptureThread(threading.Thread):
+	"""
+	A capture thread waits for its capture() method to be called then, in a separate thread of control, causes the camera to capture an image
+	
+	It also makes sure captures are queued serially and do not overlap (it waits for a captureComplete signal before deciding a capture is finished)
+	"""
 	
 	def __init__(self,camera):
 		threading.Thread.__init__(self)
 		self.camera = camera
-
+		self.captureQueue = Queue.Queue()
+		self.doneEvent = threading.Event()
+		
+	def stop(self):
+		self.doneEvent.set()
+		self.captureQueue.put(True)
+		
+	def capture(self):
+		self.captureQueue.put(False)
+	
+	def done(self):
+		self.doneEvent.set()
 	
 	def run(self):
-		try:
-			if self.camera.hasViewfinder():
-				self.camera.stopViewfinder()
-		except:
-			log.logException('failed to stop viewfinder before capture', log.WARNING)
+		while 1:
+			if self.captureQueue.get():
+				# a normal capture puts a False on the queue; a stop call puts a True on the queue
+				return
 			
-		self.camera.capture()
-		
-		try:
-			if self.camera.hasViewfinder():
+			viewfinderActive = self.camera.isViewfinderStarted()
+
+			if viewfinderActive:				
+				self.camera.stopViewfinder()
+
+			self.camera.capture()
+			
+			if not self.doneEvent.wait(15.0):
+				log.error('capture failed (took longer than 15s) -- resetting capture thread')
+			self.doneEvent.clear()
+
+			if viewfinderActive:
 				self.camera.startViewfinder()
-		except:
-			log.logException('failed to re-start viewfinder after capture', log.WARNING)
 
 
 
@@ -130,13 +153,9 @@ class MainWindow(BaseWidget,QtGui.QMainWindow):
 
 		
 	def doCapture(self):
-		captureThreads = []
-		for camera in reversed(self.app.cameras):
-			captureThreads.append(
-				CaptureThread(camera)
-			)
-		for thread in captureThreads:
-			thread.start()
+		self.startCaptureThreads()
+		for t in self.app.captureThreads.values():
+			t.capture()
 
 		
 	def startShooting(self):
@@ -179,6 +198,22 @@ class MainWindow(BaseWidget,QtGui.QMainWindow):
 		self.app.processingThread = processing.ProcessingThread(app=self.app)
 		self.app.processingThread.start()
 
+		# start per-camera viewfinder threads
+		self.app.captureThreads = {}
+		self.startCaptureThreads()
+
+
+	def startCaptureThreads(self):
+		""" start the per-camera capture threads as needed """
+		for camera in self.app.cameras:
+			if camera in self.app.captureThreads:
+				if self.app.captureThreads[camera].isAlive():
+					continue
+			log.debug('starting capture thread for %s'%camera.getName())
+			thread = CaptureThread(camera)
+			self.app.captureThreads[camera] = thread
+			thread.start()
+			
 		
 	class ShootingView(BaseWidget,QtGui.QWidget):
 		def init(self):
@@ -340,6 +375,7 @@ class MainWindow(BaseWidget,QtGui.QMainWindow):
 	def captureCompleteCallback(self,event):
 		# we have to do this via a signal because you can't have a non-gui thread doing gui stuff in Qt (this mainly affects PS-ReC drivers)
 		# TODO: this may not be necessary now the interface uses QT signals
+		self.app.captureThreads[event.camera].done()
 		self.captureComplete.emit(event)
 
 		
@@ -356,6 +392,8 @@ class MainWindow(BaseWidget,QtGui.QMainWindow):
 			pm = pm.transformed(transform)
 			
 		image = self.app.imageManager.addFromData(pm=pm,cameraIndex=cameraIndex,withPreview=True)
+		for fn in event.getAuxFiles():
+			image[cameraIndex].addAuxFromFile(fn)
 		self.app.processingQueue.put(processing.PostCaptureJob(app=self.app,image=image,cameraIndex=cameraIndex,pm=pm))
 
 	

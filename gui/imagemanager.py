@@ -53,6 +53,7 @@ class CapturedImageFile(object):
 	def __init__(self,path,filename):
 		self.path = path 
 		self.filename = filename
+		self.ext = os.path.splitext(filename)[-1]
 
 
 	def write(self,data):
@@ -66,8 +67,9 @@ class CapturedImageFile(object):
 			os.remove(self.getFilePath())
 
 	
-	def rename(self,filename=None):
-		exists = self.exists() 
+	def rename(self,filename):
+		filename = os.path.splitext(filename)[0] + self.ext
+		exists = self.exists()
 		oldFilePath = self.getFilePath()
 		self.filename = filename
 		newFilePath = self.getFilePath()
@@ -98,16 +100,36 @@ class CapturedImage(object):
 	def __init__(self,path,filename):
 		self.raw = CapturedImageFile(path,filename)
 		self.processed = CapturedImageFile(self.calcProcessedPath(path),filename)
+		self.auxiliary = []
+
+
+	@property
+	def files(self):
+		return [self.raw,self.processed] + self.auxiliary
 
 
 	def delete(self):
 		self.raw.delete()
 		self.processed.delete()
+		for f in self.files:
+			f.delete()
 		
 		
 	def rename(self,filename):
-		self.raw.rename(filename)
-		self.processed.rename(filename)
+		for f in self.files:
+			f.rename(filename)
+
+		
+	def addAuxFromFile(self,old):
+		ext = os.path.splitext(old)[-1]
+		rawBase = os.path.splitext(self.raw.getFilePath())[0]
+		new = rawBase + ext
+		path,filename = os.path.split(new)
+		if os.path.exists(new):
+			raise Exception('Cannot add new auxiliary file %s from %s because the new filename already exists'%(new,old))
+		os.rename(old,new)
+		self.auxiliary.append(CapturedImageFile(path,filename))
+		
 		
 	def calcProcessedPath(self,path):
 		return os.path.join(path,'processed')

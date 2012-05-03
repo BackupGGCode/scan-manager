@@ -59,6 +59,7 @@ class Camera(interface.Camera):
 		super(Camera,self).__init__(api)
 		self.camera = camera
 		self.opened = False
+		self.viewfinderStarted = False
 
 	
 	def open(self):
@@ -87,6 +88,7 @@ class Camera(interface.Camera):
 	
 	
 	def startViewfinder(self):
+		self.viewfinderStarted = True
 		self.camera.startViewfinder(self.handleViewfinderData)
 
 	
@@ -95,7 +97,12 @@ class Camera(interface.Camera):
 
 	
 	def stopViewfinder(self):
+		self.viewfinderStarted = False
 		self.camera.stopViewfinder()
+
+
+	def isViewfinderStarted(self):
+		return self.viewfinderStarted
 
 	
 	def getProperties(self):

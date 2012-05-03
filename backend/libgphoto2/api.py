@@ -506,9 +506,8 @@ class Camera(object):
 			return cfile.getData()
 
 	def downloadFile(self, srcfolder, srcfilename, destpath):
-		cfile = CameraFile(self,srcfolder,srcfilename)
+		cfile = CameraFile(self.api,self,srcfolder,srcfilename)
 		cfile.save(destpath)
-		self.api.checkedGP.gp_file_unref(cfile.c)
 
 	def triggerCapture(self):
 		self.api.checkedGP.gp_camera_trigger_capture(self.c, self.api.context)
@@ -589,6 +588,9 @@ class Camera(object):
 		self.api.checkedGP.gp_camera_wait_for_event(self.c,timeout,PTR(eventType),PTR(data),self.api.context)
 		if eventType.value == GP_EVENT_TIMEOUT:
 			return eventType.value,None
+		elif eventType.value == GP_EVENT_FILE_ADDED:
+			path = ctypes.cast(data,POINTER(structures.CameraFilePath))
+			return eventType.value,(path.contents.folder,path.contents.name)
 		else:
 			return eventType.value,data.value
 

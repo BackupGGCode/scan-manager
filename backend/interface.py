@@ -154,21 +154,44 @@ class ViewfinderFrameEvent(CameraEvent):
 		self.data = data
 	def getData(self):
 		"""
-		@return: L{bytes}
+		@return: frame jpeg string data
 		"""
 		return self.data
 
 
 
 class CaptureCompleteEvent(CameraEvent):
-	def __init__(self,camera,data):
+	def __init__(self,camera,data,auxFiles=[]):
 		self.camera = camera
 		self.data = data
+		self.auxFiles = auxFiles
 	def getData(self):
 		"""
-		@return: L{bytes}
+		Return file data as byte string
+		@return: bytes
 		"""
 		return self.data
+	
+	def getAuxFiles(self):
+		"""
+		Return a list of filenames of pre-downloaded auxiliary files that are to be managed with the main image
+		
+		Aux files should each have a unique extension
+		
+		@return: [str,...] 
+		"""
+		return self.auxFiles
+
+
+class PropertiesChangedEvent(CameraEvent):
+	def __init__(self,camera,properties):
+		self.camera = camera
+		self.properties = properties
+	def getProperties(self):
+		"""
+		@return: [L{CameraProperty},...]
+		"""
+		return self.properties
 
 
 
@@ -204,8 +227,9 @@ class CameraSignal(object):
 class Camera(QObject):
 	""" Generic interface for cameras """
 
-	viewfinderFrame = Signal(object)
-	captureComplete = Signal(object)
+	viewfinderFrame = CameraSignal(object) #: signal(ViewfinderFrameEvent)
+	captureComplete = CameraSignal(object) #: signal(CaptureCompleteEvent)
+	propertiesChanged = CameraSignal(object) #: signal(PropertiesChangedEvent)
 	
 	def __init__(self,api):
 		super(Camera,self).__init__()
@@ -251,6 +275,12 @@ class Camera(QObject):
 	def stopViewfinder(self):
 		"""
 		Stop capturing live view frames
+		"""
+	@abstract
+	def isViewfinderStarted(self):
+		"""
+		Return True if the viewfinder is currently active
+		@return: bool
 		"""
 	@abstract
 	def close(self):

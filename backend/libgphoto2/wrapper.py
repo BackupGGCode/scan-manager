@@ -12,7 +12,7 @@ import platform
 import threading
 import constants
 import log
-import re
+import tempfile
 
 GP_EVENT_UNKNOWN = 0
 GP_EVENT_TIMEOUT = 1
@@ -99,6 +99,8 @@ class Camera(interface.Camera):
 		self.afterOpened = False
 		self.config = None
 		self.configWidgets = {} 
+		self.capturedData = None
+		self.capturedAuxFiles = []
 		
 
 	def getName(self):	
@@ -141,8 +143,7 @@ class Camera(interface.Camera):
 	
 	def capture(self):
 		data = self.camera.captureImage()
-		e = interface.CaptureCompleteEvent(self,data=data)
-		self.captureComplete.emit(e)
+		self.capturedData = data
 	
 	
 	def getProperties(self):
@@ -171,18 +172,32 @@ class Camera(interface.Camera):
 		If we're running in manual mode, periodically check for new items on the device, fetch them, and emit a capture event
 		"""
 		
-		if self.afterOpened:
+		if not self.afterOpened:
+			return
+		
+		while 1:
 			eventType,data = self.camera.waitForEvent(timeout=0)
 			if eventType == GP_EVENT_TIMEOUT:
 				return
 			log.debug('%s %r'%(EVENTTYPE_TO_NAME[eventType],data))
 			if eventType == GP_EVENT_UNKNOWN and data.startswith('PTP Property'):
-				self.configurationFromCamera()
+				changed = self.configurationFromCamera()
+				if not changed:
+					continue
+				changedProperties = [self.getPropertyByName(widget['name']) for widget in changed]
+				event = interface.PropertiesChangedEvent(self,changedProperties)
+				self.propertiesChanged.emit(event)
+			elif eventType == GP_EVENT_FILE_ADDED:
+				path,fn = data
+				tempFn = os.path.join(tempfile.gettempdir(),tempfile.gettempprefix()+fn)
+				self.camera.downloadFile(path,fn,tempFn)
+				self.capturedAuxFiles.append(tempFn)
+			elif eventType == GP_EVENT_CAPTURE_COMPLETE:
+				e = interface.CaptureCompleteEvent(self,data=self.capturedData,auxFiles=self.capturedAuxFiles)
+				self.capturedAuxFiles = []
+				self.captureComplete.emit(e)
 				
-	#
-	# Non-interface
-	#
-	
+				
 	def startViewfinder(self):
 		if self.viewfinderThread and not self.viewfinderThread.stopped:
 			return 
@@ -194,6 +209,17 @@ class Camera(interface.Camera):
 		if self.viewfinderThread:
 			self.viewfinderThread.stopped = True
 
+
+	def isViewfinderStarted(self):
+		if self.viewfinderThread and not self.viewfinderThread.stopped:
+			return True
+		else:
+			return False 
+
+	#
+	# Non-interface
+	#
+	
 
 	def configurationToCamera(self):
 		n = 0
@@ -230,7 +256,6 @@ class Camera(interface.Camera):
 		
 		if changed:
 			changedString = '\n        '.join(['%s (%s)=%r'%(i['name'],i['label'],i['value']) for i in changed])
-			log.debug('Camera values changed\n        %s'%changedString)
 		
 		return changed
 	

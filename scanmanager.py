@@ -87,6 +87,9 @@ if __name__ == '__main__':
 				except: pass
 				try: api.close()
 				except: pass
+		for thread in getattr(app,'captureThreads',{}).values():
+			try: thread.stop()
+			except: pass
 		try: app.settings.save()
 		except: pass
 		try: app.db.close()

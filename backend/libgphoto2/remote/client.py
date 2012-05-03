@@ -6,6 +6,7 @@ import sys
 import os
 import atexit
 import log
+import glob
 
 Pyro4.config.HMAC_KEY = "gphotoremote"
 
@@ -20,6 +21,11 @@ class GPhotoClient(object):
 		
 		if dllDir is None:
 			dllDir = os.path.join(basePath,'win32')
+			
+		# remove any .pycs that might have been created with the wrong version of python (cygwin is running 2.6)
+		for f in glob.glob(os.path.join(basePath,'*.pyc')) + glob.glob(os.path.join(basePath,'remote','*.pyc')):
+			try: os.remove(f)
+			except: pass
 	
 		self.basePath = basePath
 
