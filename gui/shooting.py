@@ -106,7 +106,7 @@ class PreviewTab(BaseWidget,QtGui.QWidget):
 			self.addWidget(self._up.PreviewImage,1)
 			
 	class PreviewImage(imageviewer.ImageViewer):
-		pass
+		tabNames = ['raw','processed'] 
 		
 
 
@@ -164,11 +164,21 @@ class MainWindow(BaseWidget,QtGui.QMainWindow):
 		"""
 		
 		solo = (self.app.setup.mode == Mode.Flat) #: solo is True if we're using single rather than paired images (N.B. that this is NOT the same as only have one camera) 
+
+		if solo:
+			self.app.cameraIndices = [1]
+		else:
+			self.app.cameraIndices = [1,2]
 		
 		# override default thumbnail sizes using user-selected sizes
 		if 'thumbnailSize' in self.app.setup:
 			self.app.Thumbnails.thumbnailWidth = self.app.setup.thumbnailSize[0]
 			self.app.Thumbnails.thumbnailHeight = self.app.setup.thumbnailSize[1]
+
+		if solo:
+			self.app.ThumbnailDock.setMinimumWidth((self.app.setup.thumbnailSize[0]*1)+37)
+		else:
+			self.app.ThumbnailDock.setMinimumWidth((self.app.setup.thumbnailSize[0]*2)+37)
 			
 		# set up the image manager to manage captured images and control the thumbnail view 
 		self.app.imageManager = CapturedImageManager(path=self.app.setup.outputDirectory,view=self.app.Thumbnails,solo=solo)
@@ -350,6 +360,7 @@ class MainWindow(BaseWidget,QtGui.QMainWindow):
 			def init(self):
 				self.setWidget(self.Thumbnails)
 				self.setWidgetResizable(True)
+				#self.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
 				
 			class Thumbnails(ThumbnailView):
 				pass

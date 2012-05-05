@@ -34,10 +34,15 @@ class PostCaptureJob(ProcessingJob):
 		self.pm = pm
 		
 	def execute(self):
+		
+		if not (self.app.settings.calibrators[self.cameraIndex] and self.app.settings.calibrators[self.cameraIndex].isActive()) and not (self.app.settings.crop.get('enabled',False)):
+			# neither correction nor cropping configured so do not save a processed version
+			return
+
 		if not self.pm:
 			self.pm = QtGui.QPixmap()
 			self.pm.load(self.image[self.cameraIndex].raw.getFilePath())
-			
+		
 		# calibration correction
 		if self.app.settings.calibrators[self.cameraIndex] and self.app.settings.calibrators[self.cameraIndex].isActive():
 			self.pm = self.app.settings.calibrators[self.cameraIndex].correct(self.pm)
@@ -54,6 +59,37 @@ class PostCaptureJob(ProcessingJob):
 
 	def oncompletion(self):
 		self.app.previews[self.cameraIndex].processed.loadFromData(self.pm)
+
+
+
+class ImageLoadJob(ProcessingJob):
+	
+	priority = 4
+	
+	def __init__(self,app,image):
+		self.app = app
+		self.image = image
+		self.pms = {1:dict(raw=None,processed=None),2:dict(raw=None,processed=None)}
+		
+	def execute(self):
+		for cameraIndex in self.app.cameraIndices:
+			for state in ['raw','processed']:
+				image = getattr(self.image[cameraIndex],state)
+				if image.exists():
+					pm = QtGui.QPixmap()
+					rc = pm.load(image.getFilePath())
+					if rc:
+						self.pms[cameraIndex][state] = pm
+		
+	def oncompletion(self):
+		for cameraIndex in self.app.cameraIndices:
+			for state in ['raw','processed']:
+				preview = getattr(self.app.previews[cameraIndex],state)
+				if self.pms[cameraIndex][state]:
+					preview.loadFromData(self.pms[cameraIndex][state])
+				else:
+					preview.clear()
+
 
 
 class SimpleJob(ProcessingJob):

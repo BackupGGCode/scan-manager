@@ -29,10 +29,11 @@ class ThumbnailJob(processing.ProcessingJob):
 		self.withPreview = withPreview
 		
 	def execute(self):
-		qi = QtGui.QImage(self.image[self.cameraIndex].raw.getFilePath())
-		qi = qi.scaled(self.size[0], self.size[1], aspectRatioMode=Qt.KeepAspectRatio) #,transformMode=Qt.SmoothTransformation)
-		#qi.save(self.image[self.cameraIndex].getThumbnailPath(self.size))
-		self.pm = QtGui.QPixmap(qi)
+		pm = QtGui.QPixmap(self.image[self.cameraIndex].raw.getFilePath())
+		s = pm.size()
+		s.scale(self.size[0], self.size[1],Qt.KeepAspectRatio)
+		self.pm = pm.scaled(s,transformMode=Qt.SmoothTransformation)
+		#self.pm.save(self.image[self.cameraIndex].getThumbnailPath(self.size))
 
 	def oncompletion(self):
 		self.image.thumbnail.updateImage(self.pm,cameraIndex=self.cameraIndex)
@@ -100,17 +101,16 @@ class CapturedImage(object):
 	def __init__(self,path,filename):
 		self.raw = CapturedImageFile(path,filename)
 		self.processed = CapturedImageFile(self.calcProcessedPath(path),filename)
+		self.thumbnail = CapturedImageFile(self.calcThumbnailPath(path),filename)
 		self.auxiliary = []
 
 
 	@property
 	def files(self):
-		return [self.raw,self.processed] + self.auxiliary
+		return [self.raw,self.processed,self.thumbnail] + self.auxiliary
 
 
 	def delete(self):
-		self.raw.delete()
-		self.processed.delete()
 		for f in self.files:
 			f.delete()
 		
@@ -134,13 +134,16 @@ class CapturedImage(object):
 	def calcProcessedPath(self,path):
 		return os.path.join(path,'processed')
 	
+	
+	def calcThumbnailPath(self,path):
+		return os.path.join(path,'thumbnails')
+	
 		
 
 class CapturedImageBase(object):
 	""" 
 	Common base for both kinds of image pair (the one that's actually a pair and the one that only looks like a pair!)
 	"""
-
 
 
 class CapturedImagePair(CapturedImageBase):
@@ -230,6 +233,10 @@ class CapturedImageManager(object):
 		pPath = os.path.join(self.path,'processed')
 		if not os.path.exists(pPath):
 			os.mkdir(pPath)
+
+		tPath = os.path.join(self.path,'thumbnails')
+		if not os.path.exists(tPath):
+			os.mkdir(tPath)
 		
 	
 	def fillFromDirectory(self,progressCallback=None):
@@ -263,6 +270,7 @@ class CapturedImageManager(object):
 		self.images.append(image)
 		image.thumbnail = self.view.new(uid=image.uid)
 		image.thumbnail.image = image
+		image.thumbnail.relabel()
 		return image
 
 
@@ -345,6 +353,7 @@ class CapturedImageManager(object):
 		for ndx,image in enumerate(changed):
 			image.rename('temp%04d.jpg'%(ndx+1))
 		for ndx,image in enumerate(changed):
+			image.thumbnail.relabel()
 			for cameraIndex in self.cameraIndices:
 				image[cameraIndex].rename(self.calcFilename(self.images.index(image),cameraIndex=cameraIndex))
 		
@@ -359,19 +368,10 @@ class CapturedImageManager(object):
 
 
 	def select(self,image):
-		for cameraIndex in self.cameraIndices:
-			preview = self.view.app.previews[cameraIndex]
-			if image[cameraIndex].raw.exists():
-				preview.raw.load(image[cameraIndex].raw.getFilePath())
-			else:
-				preview.raw.clear()
-			if image[cameraIndex].processed.exists():
-				preview.processed.load(image[cameraIndex].processed.getFilePath())
-			elif preview.raw.hasImage():
-				preview.processed.loadFromData(preview.raw._pm)
 		self.selected = image
+		self.view.app.processingQueue.put(processing.ImageLoadJob(self.view.app,image))
+
 		
-	
 	def calcFilename(self,ndx,cameraIndex=1):
 		if self.solo:
 			assert cameraIndex == 1
@@ -388,3 +388,7 @@ class CapturedImageManager(object):
 		return 'page%04d.jpg'%(ndx+1)
 	
 
+	def getLabel(self,location):
+		index,image = self.normalise(location)
+		return 'page %d'%(index + 1)
+		

@@ -184,7 +184,7 @@ MAX_SCALE = 2.00
 
 
 class ImageViewer(BaseWidget,QtGui.QWidget):
-	
+
 	
 	def init(self):
 		self._pm = QtGui.QPixmap()
@@ -200,8 +200,19 @@ class ImageViewer(BaseWidget,QtGui.QWidget):
 			self._up.setLayout(self)
 			self.setSpacing(0)
 			self.setContentsMargins(0,0,0,0)
+			self.addWidget(self._up.TabBar,0)
 			self.addWidget(self._up.ImageView,1)
 			self.addWidget(self._up.Toolbar,0)
+
+	class TabBar(BaseWidget,QtGui.QTabBar):
+		#def init(self):
+		#	for i in self._up.tabNames:
+		#		self.addTab(i)
+	
+		def oncurrentChanged(self,index):
+			name = self.tabText(index)
+			#self.loadFromData(self.pms[name])
+			
 		
 	class ImageView(BaseWidget,QtGui.QGraphicsView):
 		
