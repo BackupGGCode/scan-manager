@@ -4,121 +4,11 @@ from PtpSession import PtpSession,PtpRequest,PtpPacker,PtpException
 import PtpValues
 
 import ctypes
+import struct
 
 import chdkimage
 
-class Enum(object):
-	
-	def __iter__(self):
-		for k,v in self.__dict__.items():
-			yield (k,v)
-	
-	
-	def __getitem__(self,i):
-		for k,v in self.__dict__.items():
-			if v == i:
-				return k
-		else:
-			raise KeyError(i)
-
-
-
-class Flags(object):
-	
-	def __iter__(self):
-		for k,v in self.__dict__.items():
-			yield (k,v)
-	
-	
-	def __getitem__(self,i):
-		for k,v in self.__dict__.items():
-			if v == i:
-				return k
-		else:
-			raise KeyError(i)
-
-
-	def pp(self,flags):
-		return '|'.join([k for k,v in self if v&flags])
-
-
-Operation = Enum()
-Operation.Version = 0
-Operation.GetMemory = 1
-Operation.SetMemory = 2
-Operation.CallFunction = 3
-Operation.TempData = 4
-Operation.UploadFile = 5
-Operation.DownloadFile = 6
-Operation.ExecuteScript = 7
-Operation.ScriptStatus = 8
-Operation.ScriptSupport = 9
-Operation.ReadScriptMsg = 10
-Operation.WriteScriptMsg = 11
-Operation.GetLiveData = 12
-
-PTP_OC_CHDK = 0x9999 
-
-# data types as used by ReadScriptMessage
-ScriptMessageSubType = Enum()
-ScriptMessageSubType.UNSUPPORTED = 0 # type name will be returned in data
-ScriptMessageSubType.NIL = 1
-ScriptMessageSubType.BOOLEAN = 2
-ScriptMessageSubType.INTEGER = 3
-ScriptMessageSubType.STRING = 4 # Empty strings are returned with length=0
-ScriptMessageSubType.TABLE = 5  # tables are converted to a string by usb_msg_table_to_string, the string may be empty for an empty table
-
-# TempData flags
-TempDataFlag = Flags()
-TempDataFlag.DOWNLOAD = 0x1  # download data instead of upload
-TempDataFlag.CLEAR = 0x2  # clear the stored data; with DOWNLOAD this means first download, then clear and without DOWNLOAD this means no uploading, just clear
-
-# Script Languages - for execution only lua is supported for now
-ScriptLanguage = Enum()
-ScriptLanguage.LUA = 0
-ScriptLanguage.UBASIC = 1
-
-# bit flags for script status
-ScriptStatusFlag = Flags()
-ScriptStatusFlag.RUN = 0x1 # script running
-ScriptStatusFlag.MSG = 0x2 # messages waiting
-
-# bit flags for scripting support
-ScriptSupportFlag = Enum()
-ScriptSupportFlag.LUA = 0x1
-
-# message types
-ScriptMessageType = Enum()
-ScriptMessageType.NONE = 0 # no messages waiting
-ScriptMessageType.ERR = 1 # error message
-ScriptMessageType.RET = 2 # script return value
-ScriptMessageType.USER = 3 # message queued by script
-	# TODO chdk console data ?
-
-# error subtypes for PTP_CHDK_S_MSGTYPE_ERR and script startup status
-ScriptErrorMessageType = Enum()
-ScriptErrorMessageType.NONE = 0
-ScriptErrorMessageType.COMPILE = 1
-ScriptErrorMessageType.RUN = 2
-
-# message status
-ScriptMessageStatus = Enum()
-ScriptMessageStatus.OK = 0 # queued ok
-ScriptMessageStatus.NOTRUN = 1 # no script is running
-ScriptMessageStatus.QFULL = 2 # queue is full
-ScriptMessageStatus.BADID = 3 # specified ID is not running
-
-
-# Control flags for determining which data block to transfer
-LiveViewFlag = Flags()
-LiveViewFlag.VIEWPORT = 0x01
-LiveViewFlag.BITMAP = 0x04
-LiveViewFlag.PALETTE = 0x08
-
-# Live view aspect ratios
-LiveViewAspect = Enum()
-LiveViewAspect.LV_ASPECT_4_3 = 0
-LiveViewAspect.LV_ASPECT_16_9 = 1
+from chdkconstants import *
 
 #
 # Live view frame buffer data
@@ -163,29 +53,22 @@ class LiveDataHeader(ctypes.Structure):
 				s += indent + '  %s: %r\n'%(k,v)
 		return s
 
-import Image
-
 class LiveViewFrame(object):
 	
 	def __init__(self,raw):
-		self.viewport = None
-		self.bitmap = None
 		
 		headerBuffer = ctypes.create_string_buffer(raw[:ctypes.sizeof(LiveDataHeader)])
-		header = LiveDataHeader.from_buffer(headerBuffer)
+		self.header = LiveDataHeader.from_buffer(headerBuffer)
 		
-		viewportRGB = chdkimage.dataToViewportRGB(raw,0)
-		self.viewport = Image.fromstring("RGB",(header.bitmap.logical_width,header.bitmap.logical_height),viewportRGB,'raw','RGB')
-		
-		bitmapRGBA = chdkimage.dataToBitmapRGBA(raw,0)
-		self.bitmap = Image.fromstring("RGBA",(header.bitmap.logical_width,header.bitmap.logical_height),bitmapRGBA,'raw','RGBA')
+		self.viewportRGB = chdkimage.dataToViewportRGB(raw,0)
+		self.bitmapRGBA = chdkimage.dataToBitmapRGBA(raw,0)
 
 
 class ScriptMessage(object):
 	def __init__(self,type,subType,data=None,scriptId=None):
 		self.type = type
 		self.subType = subType
-		self.data = data
+		self.data = data[1]
 		self.scriptId = scriptId
 	def __repr__(self):
 		types = ScriptMessageType[self.type]
@@ -198,8 +81,26 @@ class ScriptMessage(object):
 		else:
 			subs = '[UNKNOWN]'
 		ScriptMessageSubType
-		s = '<%s type=%d (%s) subType=%d (%s) scriptId=%s data=%r>'%(self.__class__.__name__,self.type,types,self.subType,subs,self.scriptId,self.data)
+		s = '<%s type=%d (%s) subType=%d (%s) scriptId=%s value=%r>'%(self.__class__.__name__,self.type,types,self.subType,subs,self.scriptId,self.value)
 		return s
+	
+	@property
+	def value(self):
+		if self.type == ScriptMessageType.USER:
+			if self.subType == ScriptMessageSubType.INTEGER:
+				return struct.unpack('i',self.data)[0]
+			elif self.subType == ScriptMessageSubType.BOOLEAN:
+				return bool(struct.unpack('i',self.data)[0])
+			elif self.subType == ScriptMessageSubType.NIL:
+				return None
+			elif self.subType == ScriptMessageSubType.STRING:
+				return self.data
+			elif self.subType == ScriptMessageSubType.TABLE:
+				return {k:v for k,v in [tuple(i.split('\t')) for i in self.data.split('\n')[:-1]]}
+			elif self.subType == ScriptMessageSubType.UNSUPPORTED:
+				raise Exception('Unsupported LUA type sent as a script message')
+		else:
+			return self.data
 
 
 class PtpCHDKSession(PtpSession):

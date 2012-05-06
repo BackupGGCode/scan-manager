@@ -1,6 +1,6 @@
 
-Name "ScanManager 0.4.7"
-OutFile "scanmanager-setup-windows-x86-0.4.7.exe"
+Name "ScanManager 0.4.8"
+OutFile "scanmanager-setup-windows-x86-0.4.8.exe"
 InstallDir "$PROGRAMFILES\ScanManager"
 InstallDirRegKey HKLM "Software\ScanManager" "Install_Dir"
 RequestExecutionLevel admin
@@ -43,6 +43,7 @@ Section "ScanManager (required)"
     File "/oname=_socket.pyd" "dist\_socket.pyd"
     File "/oname=_ssl.pyd" "dist\_ssl.pyd"
     File "/oname=_win32sysloader.pyd" "dist\_win32sysloader.pyd"
+    File "/oname=backend.chdk.chdkimage.chdkimage.pyd" "dist\backend.chdk.chdkimage.chdkimage.pyd"
     File "/oname=bz2.pyd" "dist\bz2.pyd"
     File "/oname=cv2.pyd" "dist\cv2.pyd"
     CreateDirectory "$INSTDIR\imageformats"
@@ -246,7 +247,7 @@ Section "ScanManager (required)"
     ; Create an uninstaller
     WriteUninstaller "uninstall.exe"
 
-    WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\ScanManager" "DisplayName" "ScanManager Camera Control 0.4.7"
+    WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\ScanManager" "DisplayName" "ScanManager Camera Control 0.4.8"
     WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\ScanManager" "UninstallString" "$\"$INSTDIR\uninstall.exe$\""    
     WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\ScanManager" "QuietUninstallString" "$\"$INSTDIR\uninstall.exe$\" /S"
     
@@ -282,6 +283,7 @@ Section "Uninstall"
     Delete "$INSTDIR\_socket.pyd"
     Delete "$INSTDIR\_ssl.pyd"
     Delete "$INSTDIR\_win32sysloader.pyd"
+    Delete "$INSTDIR\backend.chdk.chdkimage.chdkimage.pyd"
     Delete "$INSTDIR\bz2.pyd"
     Delete "$INSTDIR\cv2.pyd"
     Delete "$INSTDIR\imageformats\qgif4.dll"

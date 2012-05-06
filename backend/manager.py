@@ -15,8 +15,9 @@ if False:
 	from .wia import wrapper
 	from .libgphoto2 import wrapper
 	from .directory import wrapper
+	from .chdk import wrapper
 	
-backends = ['canonpsrec','wia','libgphoto2','directory']
+backends = ['libgphoto2','directory','canonpsrec','wia','chdk']
 
 
 APIState = Enum() #: ENUM holding the current state of a backend API

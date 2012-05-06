@@ -50,7 +50,7 @@ class CaptureThread(threading.Thread):
 			self.camera.capture()
 			
 			if not self.doneEvent.wait(15.0):
-				log.error('capture failed (took longer than 15s) -- resetting capture thread')
+				log.error('capture failed (took longer than 15s) -- check your setting for capture events')
 			self.doneEvent.clear()
 
 			if viewfinderActive:
@@ -95,40 +95,14 @@ class LiveView(BaseWidget,QtGui.QLabel):
 			self.setPixmap(self._pm)
 	
 
+class Preview(imageviewer.ImagePipelineViewer):
+	tabNames = ['raw','processed'] 
 
-class PreviewTab(BaseWidget,QtGui.QWidget):
-
-	class Layout(BaseLayout,QtGui.QVBoxLayout):
-		def init(self):
-			self._up.setLayout(self)
-			self.setSpacing(0)
-			self.setContentsMargins(0,0,0,0)
-			self.addWidget(self._up.PreviewImage,1)
-			
-	class PreviewImage(imageviewer.ImageViewer):
-		tabNames = ['raw','processed'] 
-		
-
-
-class Preview(BaseWidget,QtGui.QTabWidget):
-	
-	def init(self):
-		self.addTab(self.PreviewRaw,self.tr('Raw'))
-		self.addTab(self.PreviewProcessed,self.tr('Processed'))
-		self.raw = self.PreviewRaw.PreviewImage
-		self.processed = self.PreviewProcessed.PreviewImage
-
-	class PreviewRaw(PreviewTab):
-		pass
-
-	class PreviewProcessed(PreviewTab):
-		pass
-	
 	def showCropBox(self):
-		self.processed.cropBox.show()
+		self.cropBox.show()
 
 	def hideCropBox(self):
-		self.processed.cropBox.hide()
+		self.cropBox.hide()
 
 	
 
@@ -417,8 +391,11 @@ class MainWindow(BaseWidget,QtGui.QMainWindow):
 		cameraIndex = self.app.cameras.index(event.camera) + 1
 		viewfinder = getattr(self.app,'Viewfinder%d'%(cameraIndex))
 
-		pm = QtGui.QPixmap()
-		pm.loadFromData(event.data)
+		if isinstance(event.data,QtGui.QPixmap):
+			pm = event.data
+		else:
+			pm = QtGui.QPixmap()
+			pm.loadFromData(event.data)
 		
 		if viewfinder.isHidden():
 			viewfinder.resize(pm.size())

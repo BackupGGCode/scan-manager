@@ -101,6 +101,7 @@ class Camera(interface.Camera):
 		self.configWidgets = {} 
 		self.capturedData = None
 		self.capturedAuxFiles = []
+		self.hasCaptureEvents = None #: None means attempt to auto-detect
 		
 
 	def getName(self):	
@@ -144,6 +145,9 @@ class Camera(interface.Camera):
 	def capture(self):
 		data = self.camera.captureImage()
 		self.capturedData = data
+		if not self.hasCaptureEvents:
+			e = interface.CaptureCompleteEvent(self,data=data,auxFiles=[])
+			self.captureComplete.emit(e)
 	
 	
 	def getProperties(self):
@@ -164,6 +168,8 @@ class Camera(interface.Camera):
 				self.configurationToCamera()
 		except:
 			log.logException('unable to turn off capture mode', log.WARNING)
+		self.afterOpened = False
+		self.opened = False
 		self.camera.exit()
 			
 	
@@ -179,6 +185,9 @@ class Camera(interface.Camera):
 			eventType,data = self.camera.waitForEvent(timeout=0)
 			if eventType == GP_EVENT_TIMEOUT:
 				return
+			if self.hasCaptureEvents is None:
+				if (eventType == GP_EVENT_UNKNOWN and data.startswith('PTP Property')) or eventType == GP_EVENT_FILE_ADDED or eventType == GP_EVENT_CAPTURE_COMPLETE: 
+					self.hasCaptureEvents = True
 			log.debug('%s %r'%(EVENTTYPE_TO_NAME[eventType],data))
 			if eventType == GP_EVENT_UNKNOWN and data.startswith('PTP Property'):
 				changed = self.configurationFromCamera()

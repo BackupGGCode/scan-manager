@@ -97,7 +97,7 @@ class GeneralTab(CameraControlsTab):
 			class Rotate(BaseWidget,QtGui.QComboBox):
 				
 				def init(self):
-					self._up.Layout.addRow(self.tr('Rotation'),self)
+					self._up.Layout.addRow(self.tr('Rotation (for new images):'),self)
 					self.addItem(self.tr('No rotation'),0)
 					self.addItem(self.tr('90 CW'),90)
 					self.addItem(self.tr('180'),180)
@@ -180,13 +180,13 @@ class GeneralTab(CameraControlsTab):
 						cameraIndex = self._up._up.getCameraIndex()
 						preview = self.app.previews[cameraIndex]
 						
-						if not preview.raw.hasImage():
+						if not preview.hasImage('raw'):
 							return
 						
 						dialog = calibrate.CalibrateDialog(self)
 						dialog.setModal(True)
 						dialog.open()
-						dialog.go(preview.raw._pm,cameraIndex=cameraIndex)
+						dialog.go(preview.pixmaps['raw'],cameraIndex=cameraIndex)
 	
 	
 			class CropControlsBox(BaseWidget,QtGui.QGroupBox):

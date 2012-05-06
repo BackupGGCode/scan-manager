@@ -21,15 +21,20 @@ class CalibrateDialog(BaseDialog,QtGui.QDialog):
 	def go(self,pm,cameraIndex=1):
 		
 		self.cameraIndex = cameraIndex
-		
-		if self.app.settings.calibrators[cameraIndex]:
-			self.calibrator = self.app.settings.calibrators[cameraIndex]
+
+		c = self.app.settings.calibrators[cameraIndex]
+		if not hasattr(c,'realSizeMM') or not hasattr(c,'chessboardSize'):
+			# this can happen with some calibration failures
+			c = None
+			
+		if c:
+			self.calibrator = c
 			self.realSizeMM = list(self.calibrator.realSizeMM)
 			self.chessboardSize = list(self.calibrator.boardSize)
 		else:
 			self.calibrator = calibrator.QTCalibrator()
-			self.realSizeMM=[254.0,170.0]
-			self.chessboardSize=[25,17]
+			self.realSizeMM=[169.0,254.0]
+			self.chessboardSize=[17,25]
 			
 		self.app.settings.calibrators[cameraIndex] = self.calibrator
 			

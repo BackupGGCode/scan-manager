@@ -227,11 +227,15 @@ class CameraSignal(object):
 class Camera(QObject):
 	""" Generic interface for cameras """
 
-	viewfinderFrame = CameraSignal(object) #: signal(ViewfinderFrameEvent)
-	captureComplete = CameraSignal(object) #: signal(CaptureCompleteEvent)
-	propertiesChanged = CameraSignal(object) #: signal(PropertiesChangedEvent)
+	### N.B. do not simply switch these to CameraSignal -- those need to be instantiated in the __init__ method!
+	#viewfinderFrame = Signal(object) #: signal(ViewfinderFrameEvent)
+	#captureComplete = Signal(object) #: signal(CaptureCompleteEvent)
+	#propertiesChanged = Signal(object) #: signal(PropertiesChangedEvent)
 	
 	def __init__(self,api):
+		self.viewfinderFrame = CameraSignal(object) #: signal(ViewfinderFrameEvent)
+		self.captureComplete = CameraSignal(object) #: signal(CaptureCompleteEvent)
+		self.propertiesChanged = CameraSignal(object) #: signal(PropertiesChangedEvent)
 		super(Camera,self).__init__()
 		self.api = api
 		

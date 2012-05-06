@@ -185,7 +185,6 @@ MAX_SCALE = 2.00
 
 class ImageViewer(BaseWidget,QtGui.QWidget):
 
-	
 	def init(self):
 		self._pm = QtGui.QPixmap()
 		self.scaleFactor = 1.0
@@ -200,20 +199,9 @@ class ImageViewer(BaseWidget,QtGui.QWidget):
 			self._up.setLayout(self)
 			self.setSpacing(0)
 			self.setContentsMargins(0,0,0,0)
-			self.addWidget(self._up.TabBar,0)
 			self.addWidget(self._up.ImageView,1)
 			self.addWidget(self._up.Toolbar,0)
 
-	class TabBar(BaseWidget,QtGui.QTabBar):
-		#def init(self):
-		#	for i in self._up.tabNames:
-		#		self.addTab(i)
-	
-		def oncurrentChanged(self,index):
-			name = self.tabText(index)
-			#self.loadFromData(self.pms[name])
-			
-		
 	class ImageView(BaseWidget,QtGui.QGraphicsView):
 		
 		def init(self):
@@ -292,25 +280,29 @@ class ImageViewer(BaseWidget,QtGui.QWidget):
 						self.currentCenter.setY(bounds.y())
 		
 			self.centerOn(self.currentCenter)
-		
-		
+
+
 	def load(self,image):
 		self._pm.load(image)
 		self.loadFromData(self._pm)
 
 
 	def clear(self):
-		self.ImageView.setPixmap(QtGui.QPixmap())
+		self._pm = QtGui.QPixmap()
+		self.ImageView.setPixmap(self._pm)
 
 		
 	def loadFromData(self,data):
+		if data is None:
+			data = QtGui.QPixmap()
 		if isinstance(data,QtGui.QPixmap):
-			self._pm = data
+			pm = data
+			self._pm = pm
 		else:
 			self._pm.loadFromData(data)
-			
+
 		self.ImageView.setPixmap(self._pm)
-		
+			
 		if self.fitToWindowAct.isChecked():
 			self.fitToWindow()
 			self.updateActions()
@@ -318,7 +310,7 @@ class ImageViewer(BaseWidget,QtGui.QWidget):
 			self.rescale()
 			self.updateActions()
 			self.updateSlider()
-			
+
 
 	def zoomIn(self):
 		self.scaleImage(1.25)
@@ -374,7 +366,7 @@ class ImageViewer(BaseWidget,QtGui.QWidget):
 		self.fitToWindow()
 
 
-	def hasImage(self):
+	def hasImage(self,state=None):
 		return hasattr(self,'_pm') and not self._pm.isNull()
 
 
@@ -442,4 +434,89 @@ class ImageViewer(BaseWidget,QtGui.QWidget):
 		self.normalSizeAct.setEnabled(not self.fitToWindowAct.isChecked())
 		self.Toolbar.Slider.setEnabled(not self.fitToWindowAct.isChecked())
 
+
+
+
+class ImagePipelineViewer(ImageViewer):
+	
+	def init(self):
+		self.pixmaps = {}
+		self.scaleFactor = 1.0
+		self.createActions()
+		self.fitToWindowAct.setEnabled(True)
+		self.fitToWindowAct.setChecked(True)
+		self.Toolbar.Slider.setEnabled(False)
+		self.selectState('raw')
+		
+	class Layout(BaseLayout,QtGui.QVBoxLayout):
+		
+		def init(self):
+			self._up.setLayout(self)
+			self.setSpacing(0)
+			self.setContentsMargins(0,0,0,0)
+			self.addWidget(self._up.TabBar,0)
+			self.addWidget(self._up.ImageView,1)
+			self.addWidget(self._up.Toolbar,0)
+
+	class TabBar(BaseWidget,QtGui.QTabBar):
+		def init(self):
+			for i in self._up.tabNames:
+				self.addTab(i)
+	
+		def oncurrentChanged(self,index):
+			if not hasattr(self._up,'pixmaps'):
+				# check that we've initialised
+				return
+			name = self.tabText(index)
+			self._up.selectState(name)
+
+			
+	@property
+	def _pm(self):
+		state = self.TabBar.tabText(self.TabBar.currentIndex())
+		return self.pixmaps[state]
+
+
+	def selectState(self,state):
+		if state not in self.pixmaps:
+			self.pixmaps[state] = QtGui.QPixmap()
+		self.ImageView.setPixmap(self.pixmaps[state])
+			
+		if self.fitToWindowAct.isChecked():
+			self.fitToWindow()
+			self.updateActions()
+		else:
+			self.rescale()
+			self.updateActions()
+			self.updateSlider()
+
+		
+	def load(self,state,image):
+		if state not in self.pixmaps:
+			self.pixmaps[state] = QtGui.QPixmap()
+		self.pixmaps[state].load(image)
+		self.loadFromData(state,self.pixmaps[state])
+
+
+	def clear(self):
+		self.pixmaps = {}
+		self.ImageView.setPixmap(QtGui.QPixmap())
+
+		
+	def loadFromData(self,state,data):
+		if data is None:
+			data = QtGui.QPixmap()
+		if isinstance(data,QtGui.QPixmap):
+			pm = data
+			self.pixmaps[state] = pm
+		else:
+			if state not in self.pixmaps:
+				self.pixmaps[state] = QtGui.QPixmap()
+			pm = self.pixmaps[state]
+			pm.loadFromData(data)
+			
+		self.selectState(self.TabBar.tabText(self.TabBar.currentIndex()))
+			
+
+	
 

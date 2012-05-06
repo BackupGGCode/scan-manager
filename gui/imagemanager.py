@@ -21,25 +21,27 @@ class ThumbnailJob(processing.ProcessingJob):
 
 	priority = 100
 	
-	def __init__(self,app,image,cameraIndex,size,withPreview=False):
+	def __init__(self,app,image,cameraIndex,size,pm=None,withPreview=False):
 		self.app = app
 		self.image = image
 		self.cameraIndex = cameraIndex
 		self.size = size
 		self.withPreview = withPreview
+		self.pm = pm
 		
 	def execute(self):
-		pm = QtGui.QPixmap(self.image[self.cameraIndex].raw.getFilePath())
-		s = pm.size()
+		if not self.pm:
+			self.pm = QtGui.QPixmap(self.image[self.cameraIndex].raw.getFilePath())
+		s = self.pm.size()
 		s.scale(self.size[0], self.size[1],Qt.KeepAspectRatio)
-		self.pm = pm.scaled(s,transformMode=Qt.SmoothTransformation)
-		#self.pm.save(self.image[self.cameraIndex].getThumbnailPath(self.size))
+		self.scaledPM = self.pm.scaled(s,transformMode=Qt.SmoothTransformation)
+		#self.scaledPM.save(self.image[self.cameraIndex].getThumbnailPath(self.size))
 
 	def oncompletion(self):
-		self.image.thumbnail.updateImage(self.pm,cameraIndex=self.cameraIndex)
+		self.image.thumbnail.updateImage(self.scaledPM,cameraIndex=self.cameraIndex)
 		if self.withPreview:
 			preview = self.app.previews[self.cameraIndex]
-			preview.raw.loadFromData(self.pm)
+			preview.loadFromData('raw',self.pm)
 
 
 
@@ -289,12 +291,18 @@ class CapturedImageManager(object):
 			image = self.new(filename)
 		
 		pm.save(image[cameraIndex].raw.getFilePath())
-		image.thumbnail.updateImage(pm,cameraIndex=cameraIndex)
-		
-		if withPreview:
-			preview = self.view.app.previews[cameraIndex]
-			preview.raw.loadFromData(pm)
-		
+
+		self.view.app.processingQueue.put(
+			ThumbnailJob(
+				app = self.view.app,
+				image = image,
+				cameraIndex = cameraIndex,
+				size = (self.view.thumbnailWidth,self.view.thumbnailHeight),
+				pm = pm,
+				withPreview = withPreview,
+			)
+		)
+
 		return image
 
 
@@ -365,11 +373,16 @@ class CapturedImageManager(object):
 		self.view.remove(image.thumbnail)
 		for ndx,i in enumerate(self.images[index:]):
 			i.rename(self.calcBaseFilename(ndx+index))
+			i.thumbnail.relabel()
 
 
 	def select(self,image):
 		self.selected = image
-		self.view.app.processingQueue.put(processing.ImageLoadJob(self.view.app,image))
+		if image is None:
+			for cameraIndex in self.view.app.cameraIndices:
+				self.view.app.previews[cameraIndex].clear()
+		else:
+			self.view.app.processingQueue.put(processing.ImageLoadJob(self.view.app,image))
 
 		
 	def calcFilename(self,ndx,cameraIndex=1):

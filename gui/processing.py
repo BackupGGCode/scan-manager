@@ -58,7 +58,7 @@ class PostCaptureJob(ProcessingJob):
 		self.pm.save(self.image[self.cameraIndex].processed.getFilePath())
 
 	def oncompletion(self):
-		self.app.previews[self.cameraIndex].processed.loadFromData(self.pm)
+		self.app.previews[self.cameraIndex].loadFromData('processed',self.pm)
 
 
 
@@ -83,12 +83,12 @@ class ImageLoadJob(ProcessingJob):
 		
 	def oncompletion(self):
 		for cameraIndex in self.app.cameraIndices:
-			for state in ['raw','processed']:
-				preview = getattr(self.app.previews[cameraIndex],state)
-				if self.pms[cameraIndex][state]:
-					preview.loadFromData(self.pms[cameraIndex][state])
-				else:
-					preview.clear()
+			self.app.previews[cameraIndex].loadFromData('raw',self.pms[cameraIndex]['raw'])
+			if self.pms[cameraIndex]['processed']:
+				self.app.previews[cameraIndex].loadFromData('processed',self.pms[cameraIndex]['processed'])
+			else:
+				self.app.previews[cameraIndex].loadFromData('processed',self.pms[cameraIndex]['raw'])
+				
 
 
 

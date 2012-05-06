@@ -189,13 +189,13 @@ class PtpUsbTransport(PtpAbstractTransport.PtpAbstractTransport):
             timeout = self.usb_read_timeout
         if ep == None:
             ep = self.__bulkin
+        
+        rc = self.__bulkin.read(urb_size, timeout)
+        if len(rc) == 0:
+            rc = self.__bulkin.read(urb_size, timeout)
+            
+        return rc.tostring()
 
-        tmp = ''.join([chr(x) for x in self.__bulkin.read(urb_size, timeout)])
-        if len(tmp) == 0:
-            # Retry...
-            tmp = ''.join([chr(x) for x in self.__bulkin.read(urb_size, timeout)])
-        return tmp
-    
     def __hexdump(self, data):
         print
         for b in data:
