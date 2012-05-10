@@ -43,7 +43,7 @@ class FormData(object):
 		for k,v in self.items():
 			if isinstance(v,FormData):
 				s += indent + '  %s:\n'%k
-				s += v._pp(indent + '    ')
+				s += v._pp(indent + '	')
 			else:
 				s += indent + '  %s=%r\n'%(k,v)
 		return s
@@ -992,3 +992,85 @@ class GroupBox(Factory):
 	klass = _GroupBox
 
 
+
+class TableModel(QtCore.QAbstractTableModel):
+
+	def __init__(self,columns=None,data=None,parent=None):
+		super(TableModel, self).__init__(parent)
+		if data is None:
+			data = []
+		if columns is None:
+			columns = []
+		self.columns = columns
+		self.data = data
+
+	def rowCount(self, index=QtCore.QModelIndex()):
+		return len(self.data)
+
+	def columnCount(self, index=QtCore.QModelIndex()):
+		return len(self.columns)
+
+	def data(self, index, role=Qt.DisplayRole):
+		if not index.isValid():
+			return None
+
+		if not 0 <= index.row() < len(self.data):
+			return None
+
+		if role != Qt.DisplayRole:
+			return None
+		
+		column = self.columns[index.column()]
+		return self.data[column.name]
+
+	def headerData(self, section, orientation, role=Qt.DisplayRole):
+		if role != Qt.DisplayRole:
+			return None
+
+		if orientation != Qt.Horizontal:
+			return None
+		
+		return self.columns[section].label
+
+	def insertRows(self, position, rows=1, index=QtCore.QModelIndex()):
+		self.beginInsertRows(QtCore.QModelIndex(), position, position + rows - 1)
+
+		for row in range(rows):
+			self.data.insert(position + row, dict())
+
+		self.endInsertRows()
+		return True
+
+	def removeRows(self, position, rows=1, index=QtCore.QModelIndex()):
+		self.beginRemoveRows(QtCore.QModelIndex(), position, position + rows - 1)
+
+		del self.data[position:position+rows]
+
+		self.endRemoveRows()
+		return True
+
+	def setData(self, index, value, role=Qt.EditRole):
+		if role != Qt.EditRole:
+			return False
+
+		if not index.isValid():
+			return False
+		
+		if not (0 <= index.row() < len(self.addresses)):
+			return False
+		
+		datum = self.data[index.row()]
+		
+		if index.column() < 0  or index.column() >= len(self.columns):
+			return True
+		
+		column = self.columns[index.column()]
+		datum[column.name] = value
+
+		self.dataChanged.emit(index, index)
+		return True
+
+	def flags(self, index):
+		if not index.isValid():
+			return Qt.ItemIsEnabled
+		return Qt.ItemFlags(QtCore.QAbstractTableModel.flags(self, index) | Qt.ItemIsEditable)
