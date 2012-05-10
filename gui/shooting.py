@@ -157,7 +157,7 @@ class MainWindow(BaseWidget,QtGui.QMainWindow):
 		# set up the image manager to manage captured images and control the thumbnail view 
 		self.app.imageManager = CapturedImageManager(path=self.app.setup.outputDirectory,view=self.app.Thumbnails,solo=solo)
 		self.app.Thumbnails.solo = solo
-		progress = ProgressDialog(parent=self.app.MainWindow,text='Thumbnailing existing images',minimum=0,maximum=100)
+		progress = ProgressDialog(parent=self.app.MainWindow,text='Loading existing images',minimum=0,maximum=100)
 		
 		# the the image manager with any pre-existing images in the target directory
 		progress.open()

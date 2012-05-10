@@ -30,12 +30,18 @@ class ThumbnailJob(processing.ProcessingJob):
 		self.pm = pm
 		
 	def execute(self):
+		
+		if self.image[self.cameraIndex].thumbnail.exists():
+			self.scaledPM = QtGui.QPixmap()
+			self.scaledPM.load(self.image[self.cameraIndex].thumbnail.getFilePath())
+			return
+		
 		if not self.pm:
 			self.pm = QtGui.QPixmap(self.image[self.cameraIndex].raw.getFilePath())
 		s = self.pm.size()
 		s.scale(self.size[0], self.size[1],Qt.KeepAspectRatio)
 		self.scaledPM = self.pm.scaled(s,transformMode=Qt.SmoothTransformation)
-		#self.scaledPM.save(self.image[self.cameraIndex].getThumbnailPath(self.size))
+		self.scaledPM.save(self.image[self.cameraIndex].thumbnail.getFilePath())
 
 	def oncompletion(self):
 		self.image.thumbnail.updateImage(self.scaledPM,cameraIndex=self.cameraIndex)
@@ -208,9 +214,9 @@ class CapturedImageSingle(CapturedImageBase):
 	
 	def rename(self,filename):
 		self.image.rename(filename)
-	
-	
-	
+
+
+
 class CapturedImageManager(object):
 	
 
@@ -222,7 +228,7 @@ class CapturedImageManager(object):
 	
 	def __init__(self,path,view,solo=False):
 		self.path = path
-		self.images = []
+		self._images = []
 		self.view = view
 		self.solo = solo
 		self.selected = None
@@ -269,7 +275,7 @@ class CapturedImageManager(object):
 			image = CapturedImageSingle(path=self.path,filename=filename)
 		else:
 			image = CapturedImagePair(path=self.path,filename=filename)
-		self.images.append(image)
+		self._images.append(image)
 		image.thumbnail = self.view.new(uid=image.uid)
 		image.thumbnail.image = image
 		image.thumbnail.relabel()
@@ -283,11 +289,11 @@ class CapturedImageManager(object):
 			pm.loadFromData(data)
 		
 		ndx = 0
-		for ndx,image in enumerate(self.images):
+		for ndx,image in enumerate(self._images):
 			if not image[cameraIndex].raw.exists():
 				break
 		else:
-			filename = self.calcBaseFilename(len(self.images))
+			filename = self.calcBaseFilename(len(self._images))
 			image = self.new(filename)
 		
 		pm.save(image[cameraIndex].raw.getFilePath())
@@ -310,7 +316,7 @@ class CapturedImageManager(object):
 		
 		filepath = os.path.join(self.path,filename)
 		
-		for image in self.images:
+		for image in self._images:
 			if not image[cameraIndex].raw.exists():
 				break
 			if image[cameraIndex].raw.filename == filename:
@@ -335,25 +341,25 @@ class CapturedImageManager(object):
 	def normalise(self,v):
 		if isinstance(v,CapturedImageBase):
 			image = v
-			index = self.images.index(v)
+			index = self._images.index(v)
 		else:
 			index = v
-			image = self.images[v]
+			image = self._images[v]
 		return index,image
 	
 	
 	def move(self,fromLocation,toLocation):
 		fromIndex,fromImage = self.normalise(fromLocation)
 		toIndex,toImage = self.normalise(toLocation)
-		del(self.images[fromIndex])
-		self.images.insert(toIndex,fromImage)
+		del(self._images[fromIndex])
+		self._images.insert(toIndex,fromImage)
 		self.view.move(fromImage.thumbnail,toIndex)
 		self.renameChanged()
 
 	
 	def renameChanged(self):
 		changed = []
-		for ndx,image in enumerate(self.images):
+		for ndx,image in enumerate(self._images):
 			for cameraIndex in self.cameraIndices:
 				if image[cameraIndex].raw.filename and image[cameraIndex].raw.filename != self.calcFilename(ndx,cameraIndex=cameraIndex):
 					changed.append(image)
@@ -363,15 +369,15 @@ class CapturedImageManager(object):
 		for ndx,image in enumerate(changed):
 			image.thumbnail.relabel()
 			for cameraIndex in self.cameraIndices:
-				image[cameraIndex].rename(self.calcFilename(self.images.index(image),cameraIndex=cameraIndex))
+				image[cameraIndex].rename(self.calcFilename(self._images.index(image),cameraIndex=cameraIndex))
 		
 		
 	def delete(self,fromLocation):
 		index,image = self.normalise(fromLocation)
-		del(self.images[index])
+		del(self._images[index])
 		image.delete()
 		self.view.remove(image.thumbnail)
-		for ndx,i in enumerate(self.images[index:]):
+		for ndx,i in enumerate(self._images[index:]):
 			i.rename(self.calcBaseFilename(ndx+index))
 			i.thumbnail.relabel()
 

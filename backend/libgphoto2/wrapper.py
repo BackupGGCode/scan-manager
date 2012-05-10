@@ -175,7 +175,7 @@ class Camera(interface.Camera):
 	
 	def ontimer(self):
 		"""
-		If we're running in manual mode, periodically check for new items on the device, fetch them, and emit a capture event
+
 		"""
 		
 		if not self.afterOpened:
@@ -187,8 +187,11 @@ class Camera(interface.Camera):
 				return
 			if self.hasCaptureEvents is None:
 				if (eventType == GP_EVENT_UNKNOWN and data.startswith('PTP Property')) or eventType == GP_EVENT_FILE_ADDED or eventType == GP_EVENT_CAPTURE_COMPLETE: 
+					### TEMP: if we get any valid event we guess that the camera supports PTP end capture events -- not ideal!  
 					self.hasCaptureEvents = True
-			log.debug('%s %r'%(EVENTTYPE_TO_NAME[eventType],data))
+			if not eventType == GP_EVENT_UNKNOWN and data.startswith('PTP Property'):
+				# log everything except timeouts and PTP property change events
+				log.debug('%s %r'%(EVENTTYPE_TO_NAME[eventType],data))  
 			if eventType == GP_EVENT_UNKNOWN and data.startswith('PTP Property'):
 				changed = self.configurationFromCamera()
 				if not changed:
