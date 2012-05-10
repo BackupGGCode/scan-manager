@@ -6,7 +6,7 @@ from PySide import QtGui
 from PySide import QtCore
 from PySide.QtCore import Qt
 
-from pysideline.forms import Form,LineEdit,TextEdit,ComboBox,SpinBox,Slider,GroupBox
+from pysideline.forms import Form,LineEdit,TextEdit,ComboBox,SpinBox,Slider,GroupBox,TableView,Column
 
 MyForm = Form(name='main',contents=[
 	LineEdit(name='f1',label='Field 1 [f1]:',default='default_value'),
@@ -25,95 +25,13 @@ MyForm = Form(name='main',contents=[
 			LineEdit(name='f10',label='Field g1.g2.2 (int) [f10]:',default=2,type=int),
 		]),
 	]),
+	TableView(name='t1',label='Table 1:',columns=[
+		Column(name='name',label='Name',editable=True,editor=
+			SpinBox(name='nameEditor',label='Name editor:',default=4,minimum=0,maximum=100,singleStep=2,prefix='v=',suffix='%')
+		),
+		Column(name='address',label='Address',editable=True)
+	]),
 ])
-
-class TableModel(QtCore.QAbstractTableModel):
-
-    def __init__(self, addresses=None, parent=None):
-        super(TableModel, self).__init__(parent)
-
-        if addresses is None:
-            self.addresses = []
-        else:
-            self.addresses = addresses
-
-    def rowCount(self, index=QtCore.QModelIndex()):
-        return len(self.addresses)
-
-    def columnCount(self, index=QtCore.QModelIndex()):
-        return 2
-
-    def data(self, index, role=Qt.DisplayRole):
-        if not index.isValid():
-            return None
-
-        if not 0 <= index.row() < len(self.addresses):
-            return None
-
-        if role == Qt.DisplayRole:
-            name = self.addresses[index.row()]["name"]
-            address = self.addresses[index.row()]["address"]
-
-            if index.column() == 0:
-                return name
-            elif index.column() == 1:
-                return address
-
-        return None
-
-    def headerData(self, section, orientation, role=Qt.DisplayRole):
-        if role != Qt.DisplayRole:
-            return None
-
-        if orientation == Qt.Horizontal:
-            if section == 0:
-                return "Name"
-            elif section == 1:
-                return "Address"
-        
-        return None
-
-    def insertRows(self, position, rows=1, index=QtCore.QModelIndex()):
-        self.beginInsertRows(QtCore.QModelIndex(), position, position + rows - 1)
-
-        for row in range(rows):
-            self.addresses.insert(position + row, {"name":"", "address":""})
-
-        self.endInsertRows()
-        return True
-
-    def removeRows(self, position, rows=1, index=QtCore.QModelIndex()):
-        self.beginRemoveRows(QtCore.QModelIndex(), position, position + rows - 1)
-
-        del self.addresses[position:position+rows]
-
-        self.endRemoveRows()
-        return True
-
-    def setData(self, index, value, role=Qt.EditRole):
-        if role != Qt.EditRole:
-            return False
-
-        if index.isValid() and 0 <= index.row() < len(self.addresses):
-            address = self.addresses[index.row()]
-            if index.column() == 0:
-                address["name"] = value
-            elif index.column() == 1:
-                address["address"] = value
-            else:
-                return False
-
-            self.dataChanged.emit(index, index)
-            return True
-
-        return False
-
-    def flags(self, index):
-        if not index.isValid():
-            return Qt.ItemIsEnabled
-        return Qt.ItemFlags(QtCore.QAbstractTableModel.flags(self, index) |
-                            Qt.ItemIsEditable)
-
 
 class App(Application):
 	
@@ -142,20 +60,6 @@ class App(Application):
 					self.app.myForm = MyForm(None)
 					self.form = self.app.myForm.create(self)
 					self.Layout.addWidget(self.form)
-					
-			class MyTable(BaseWidget,QtGui.QTableView):
-				def init(self):
-					self.model = TableModel()
-					self.setModel(self.model)
-					self.setSelectionBehavior(QtGui.QAbstractItemView.SelectRows)
-					self.horizontalHeader().setStretchLastSection(True)
-					self.verticalHeader().hide()
-					#self.setEditTriggers(QtGui.QAbstractItemView.NoEditTriggers)
-					self.setSelectionMode(QtGui.QAbstractItemView.SingleSelection)
-					self.model.insertRows(position=0,rows=2)
-					self.model.setData(self.model.index(0,0),'a')
-					self.model.setData(self.model.index(0,1),'b')
-					self._up.Layout.addWidget(self)
 					
 			class OKButton(BaseWidget,QtGui.QPushButton):
 				def init(self):
