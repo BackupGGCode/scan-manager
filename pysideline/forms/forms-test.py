@@ -7,7 +7,7 @@ from PySide import QtCore
 from PySide.QtCore import Qt
 import resources
 
-from pysideline.forms import Form,LineEdit,TextEdit,ComboBox,SpinBox,Slider,GroupBox,TableView,Column
+from pysideline.forms import Form,LineEdit,TextEdit,ComboBox,SpinBox,Slider,GroupBox,TableView,Column,DoubleSpinBox
 
 MyForm = Form(name='main',contents=[
 	LineEdit(name='f1',label='Field 1 [f1]:',default='default_value'),
@@ -16,6 +16,7 @@ MyForm = Form(name='main',contents=[
 	ComboBox(name='f4',label='Combo [f4]:',default=2,type=str,depends=['options=f3.currentIndexChanged'],
 			 options=lambda f:[('%d'%(f.f3.getValue() or 0),'test %d.%d'%((f.f3.getValue() or 0),i)) for i in [5,6,7,8,9]]
 	),
+	DoubleSpinBox(name='f4.1',label='Field 4.1 [f4.1]:',default=14.1,minimum=10.0,maximum=20.0,singleStep=0.1,decimals=2,prefix='x=',suffix='s'),
 	SpinBox(name='f5',label='Field 5 [f5]:',default=4,minimum=0,maximum=100,singleStep=2,prefix='v=',suffix='%'),
 	Slider(name='f6',label='Field 6 [f6]:',default=4,minimum=0,maximum=100,tickInterval=10,singleStep=5,tickPosition=QtGui.QSlider.TicksBelow,orientation=Qt.Horizontal),
 	GroupBox(name='g1',title='Group 1',groupData=True,contents=[
@@ -26,12 +27,18 @@ MyForm = Form(name='main',contents=[
 			LineEdit(name='f10',label='Field g1.g2.2 (int) [f10]:',default=2,type=int),
 		]),
 	]),
-	TableView(name='t1',columns=[
-		Column(name='name',label='Name',editable=True,editor=
-			SpinBox(name='nameEditor',label='Name editor:',default=4,minimum=0,maximum=100,singleStep=2,prefix='v=',suffix='%')
-		),
-		Column(name='address',label='Address',editable=True)
-	]),
+	TableView(name='t1',
+		editForm=Form(name='tableEdit',contents=[
+			LineEdit(name='name',label='Name:',type=int),
+			LineEdit(name='address',label='Address:',type=unicode),
+		]),
+		columns=[
+			Column(name='name',label='Name',editable=True,editor=
+				SpinBox(name='nameEditor',label='Name editor:',default=4,minimum=0,maximum=100,singleStep=2,prefix='v=',suffix='%')
+			),
+			Column(name='address',label='Address',editable=True,editor=LineEdit(name='testEditor')),
+		],
+	),
 ])
 
 class App(Application):

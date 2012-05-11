@@ -25,8 +25,8 @@ class ConfigurationError(Exception):
 
 class FormData(object):
 	
-	def __init__(self):
-		pass
+	def __init__(self,**kargs):
+		self.__dict__.update(kargs)
 	
 	
 	def setValue(self,k,v):
@@ -149,8 +149,8 @@ class _Property(object):
 		# Validate value 
 		if v is NOTSET and self.required:
 			raise self.configurationError('require %s to be set'%self.name)
-		
-		if getattr(self,'type',None) is not callable:
+
+		if getattr(self,'type',None) is not callable and not isinstance(v,Factory):
 			numArgs = getNumArgs(v)
 			if numArgs is not None:
 				self.recalculable = True
@@ -189,7 +189,7 @@ class _Property(object):
 		if hasattr(self,'options'):
 			if v not in self.options:
 				self.configurationError('must be one of %r'%self.options)
-				
+
 		# Store the value
 		self.value = v
 	
@@ -221,11 +221,15 @@ class _QtProperty(_Property):
 			return
 		if getattr(self,'target',None):
 			for i in self.target.split('.'):
-				q = getattr(q,i)
+				if i.endswith('()'):
+					q = getattr(q,i[:-2])()
+				else:
+					q = getattr(q,i)
 		if hasattr(self,'setter'):
 			k = self.setter
 		else:
-			k = 'set%s%s'%(self.name[0].upper(),self.name[1:])
+			n = self.name.split('_')[-1]
+			k = 'set%s%s'%(n[0].upper(),n[1:])
 		setter = getattr(q,k)
 		setter(self.value)
 
@@ -319,13 +323,19 @@ class Configurable(object):
 		self.kargs = kargs
 		self.recalculable = []
 
-		for k,v in kargs.items():
-			if k not in self._properties:
-				raise ConfigurationError('Unknown property %s=%r in %r'%(k,v,self))
-			property = self._properties[k]
+		for property in self._properties.values():
+			v = kargs.get(property.name,NOTSET)
+			if v is NOTSET and hasattr(property,'default') and property.default is not NOTSET:
+				v = property.default
+			if v is NOTSET:
+				continue
 			property.set(v,firstTime=True) # firstTime is set so don't calculate any calculated properties
 			if property.recalculable:
 				self.recalculable.append(property)
+				
+		for k,v in kargs.items():
+			if k not in self._properties:
+				raise ConfigurationError('Unknown property %s=%r in %r'%(k,v,self))
 
 
 	def recalculate(self,propertyName=None):
@@ -466,6 +476,9 @@ class BaseWidgetField(BaseField):
 			if isinstance(property,_EventProperty):
 				property.connect(self._qt)
 
+		if hasattr(self._qt,'afterCreate'):
+			self._qt.afterCreate()
+			
 		self.init()
 		
 		return self._qt
@@ -581,6 +594,9 @@ class _AbstractGroup(BaseWidgetField):
 		
 	def getValue(self):
 		
+		if not self.groupData:
+			return NOTSTORED
+		
 		data = FormData()
 		
 		for field in self._children.values():
@@ -602,6 +618,11 @@ class _AbstractGroup(BaseWidgetField):
 		
 		for k,v in v.items():
 			self.getField(k).setValue(v)
+
+
+	def clear(self):
+		for child in self._children.values():
+			child.clear()
 		
 
 	@property
