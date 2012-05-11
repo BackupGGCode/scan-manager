@@ -7,13 +7,11 @@ class ColumnDelegate(QtGui.QItemDelegate):
 		self.column = column
 		super(ColumnDelegate,self).__init__(*args,**kargs)
 	def createEditor(self,parent,option,index):
-		print 'createEditor'
 		return self.column.editor.create(parent)
 	def setEditorData(self,editor,index):
 		v = index.model().data(index)
 		return editor._field.setValue(v)
 	def setModelData(self,editor,model,index):
-		print 'setModelData'
 		model.setData(index,editor._field.getValue())
 		
 
@@ -199,17 +197,45 @@ class TableModel(QtCore.QAbstractTableModel):
 	def toList(self):
 		out = [i._toDict() for i in self._data]
 	
+
+
+class TableViewWidget(BaseWidget,QtGui.QWidget):
+	
+	class Layout(BaseLayout,QtGui.QVBoxLayout):
+		def init(self):
+			self.setContentsMargins(0,0,0,0)
+			self._up.setLayout(self)
+	
+	class Toolbar(BaseWidget,QtGui.QToolBar):
+		def init(self):
+			self._up.Layout.addWidget(self)
+			self.actionInsert = self.addAction(QtGui.QIcon(':/plus-16.png'),'')
+			self.actionDelete = self.addAction(QtGui.QIcon(':/minus-16.png'),'')
+			self.actionUp = self.addAction(QtGui.QIcon(':/up-16.png'),'')
+			self.actionTop = self.addAction(QtGui.QIcon(':/top-16.png'),'')
+			self.actionDown = self.addAction(QtGui.QIcon(':/down-16.png'),'')
+			self.actionBottom = self.addAction(QtGui.QIcon(':/bottom-16.png'),'')
+			self.setIconSize(QtCore.QSize(16,16))
+			
+		def onactionTriggered(self,action):
+			if action == self.actionInsert:
+				self._up._field.model.insertRows(position=0,rows=1)
+
+	class Table(BaseWidget,QtGui.QTableView):
+		def init(self):
+			self._up.Layout.addWidget(self)
+
+	
 	
 class _TableView(BaseWidgetField):
 	Name = 'TableView'
-	QtClass = QtGui.QTableView 
+	QtClass = TableViewWidget
 	
 	Properties = Properties(
 		
 		base._AbstractGroup.Properties,
 		Properties.core,
 		Properties.widget,
-		Properties.formLayout,
 		
 		Property(name='columns',required=True,type=list,subType=Column),
 
@@ -217,24 +243,21 @@ class _TableView(BaseWidgetField):
 	
 	def init(self):
 		self.model = TableModel(self.columns)
-		self._qt.setModel(self.model)
-		self._qt.setSelectionBehavior(QtGui.QAbstractItemView.SelectRows)
-		self._qt.horizontalHeader().setStretchLastSection(True)
-		self._qt.verticalHeader().hide()
-		#self._qt.setEditTriggers(QtGui.QAbstractItemView.NoEditTriggers)
-		self._qt.setSelectionMode(QtGui.QAbstractItemView.SingleSelection)
-		self.model.insertRows(position=0,rows=2)
-		self.model.setData(self.model.index(0,0),'a')
-		self.model.setData(self.model.index(0,1),0.01)
-		#self._qt.setStyleSheet('QTableView::item { background-color: red; padding: 0px; border: 0px; height: 16px;}')
-		#self._qt.setStyleSheet('QTableView::item::text { color: blue; padding: 0px; border: 0px; }')
-		#self._qt.verticalHeader().setDefaultSectionSize( 16 )
+		self._qt.Table.setModel(self.model)
+		self._qt.Table.setSelectionBehavior(QtGui.QAbstractItemView.SelectRows)
+		self._qt.Table.horizontalHeader().setStretchLastSection(True)
+		self._qt.Table.verticalHeader().hide()
+		#self._qt.Table.setEditTriggers(QtGui.QAbstractItemView.NoEditTriggers)
+		self._qt.Table.setSelectionMode(QtGui.QAbstractItemView.SingleSelection)
+		#self._qt.Table.setStyleSheet('QTableView::item { background-color: red; padding: 0px; border: 0px; height: 16px;}')
+		#self._qt.Table.setStyleSheet('QTableView::item::text { color: blue; padding: 0px; border: 0px; }')
+		self._qt.Table.verticalHeader().setDefaultSectionSize( 20 )
 
 		for index,column in enumerate(self.columns):
 			delegate = column.createDelegate(self._qt)
 			if not delegate:
 				continue
-			self._qt.setItemDelegateForColumn(index,delegate)
+			self._qt.Table.setItemDelegateForColumn(index,delegate)
 		
 	def getValue(self):
 		return self.model._data

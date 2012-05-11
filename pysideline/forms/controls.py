@@ -64,6 +64,7 @@ Properties.formLayout = Properties(
     ]),
     QtProperty(name='spacing',type=int,target='Layout'),
     QtProperty(name='verticalSpacing',type=int,target='Layout'),
+    QtProperty(name='contentsMargins',type=tuple,target='Layout',setter='setContentsMargins'),
 )
 
 
@@ -330,7 +331,10 @@ class _SpinBox(BaseWidgetField):
     
         
     def setValue(self,v):
-        self._qt.setValue(v)
+        if v is NOTSET or v is None:
+            self._qt.clear()
+        else:
+            self._qt.setValue(v)
 
 class SpinBox(Factory):
     klass = _SpinBox

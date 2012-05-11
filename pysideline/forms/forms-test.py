@@ -5,6 +5,7 @@ from base import *
 from PySide import QtGui
 from PySide import QtCore
 from PySide.QtCore import Qt
+import resources
 
 from pysideline.forms import Form,LineEdit,TextEdit,ComboBox,SpinBox,Slider,GroupBox,TableView,Column
 
@@ -25,7 +26,7 @@ MyForm = Form(name='main',contents=[
 			LineEdit(name='f10',label='Field g1.g2.2 (int) [f10]:',default=2,type=int),
 		]),
 	]),
-	TableView(name='t1',label='Table 1:',columns=[
+	TableView(name='t1',columns=[
 		Column(name='name',label='Name',editable=True,editor=
 			SpinBox(name='nameEditor',label='Name editor:',default=4,minimum=0,maximum=100,singleStep=2,prefix='v=',suffix='%')
 		),
@@ -47,11 +48,13 @@ class App(Application):
 			
 			class Layout(BaseLayout,QtGui.QVBoxLayout):
 				def init(self):
+					self.setContentsMargins(0,0,0,0)
 					self._up.setLayout(self)
 					
 			class FormWidget(BaseWidget,QtGui.QWidget):
 				class Layout(BaseLayout,QtGui.QVBoxLayout):
 					def init(self):
+						self.setContentsMargins(0,0,0,0)
 						self._up.setLayout(self)
 						
 				def init(self):

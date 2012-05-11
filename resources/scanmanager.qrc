@@ -11,5 +11,12 @@
     	<file>zoom-actual-16.png</file>
     	<file>hourglass-48.png</file>
     	<file>chessboard-howto.png</file>
+    	<file>copy-16.png</file>
+    	<file>minus-16.png</file>
+    	<file>plus-16.png</file>
+    	<file>up-16.png</file>
+    	<file>down-16.png</file>
+    	<file>top-16.png</file>
+    	<file>bottom-16.png</file>
 	</qresource>
 </RCC>
