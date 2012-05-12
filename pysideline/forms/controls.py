@@ -1,73 +1,5 @@
-import base
+from . import base
 from .base import *
-
-#
-# Common properties
-#
-
-Properties.core = Properties(
-	# Core properies
-	Property(name='name',type=str,required=True),
-	Property(name='label',type=str),
-	Property(name='depends',type=list,subType=str),
-)
-	
-Properties.widget = Properties(
-	# General widget properties
-	QtProperty(name='styleSheet',type=str),
-	QtProperty(name='enabled',type=bool),
-	QtProperty(name='font',type=object),
-	QtProperty(name='visible',type=object),
-	QtProperty(name='graphicsEffect',type=object),
-	QtProperty(name='inputMethodHints',type=object,
-		options=[Qt.ImhDialableCharactersOnly,Qt.ImhDigitsOnly,Qt.ImhEmailCharactersOnly,Qt.ImhExclusiveInputMask,
-				 Qt.ImhFormattedNumbersOnly,Qt.ImhHiddenText,Qt.ImhLowercaseOnly,Qt.ImhNoAutoUppercase,Qt.ImhNoPredictiveText,
-				 Qt.ImhPreferLowercase,Qt.ImhPreferNumbers,Qt.ImhPreferUppercase,Qt.ImhUppercaseOnly,Qt.ImhUrlCharactersOnly]),
-	QtProperty(name='whatsThis',type=str),
-	QtProperty(name='toolTip',type=str),
-
-	# General widget properties (size)
-	QtProperty(name='fixedWidth',type=object),
-	QtProperty(name='fixedHeight',type=object),
-	QtProperty(name='minimumWidth',type=object),
-	QtProperty(name='minimumHeight',type=object),
-)
-
-
-Properties.valueField = Properties(
-	# General value-field properties
-	Property(name='type'),
-	Property(name='default'),
-	Property(name='validate'),
-	Property(name='required',type=bool),
-)		
-
-
-Properties.formLayout = Properties(
-	# Form layout properties
-	QtProperty(name='fieldGrowthPolicy',target='Layout',options=[
-		QtGui.QFormLayout.FieldGrowthPolicy.AllNonFixedFieldsGrow,
-		QtGui.QFormLayout.FieldGrowthPolicy.ExpandingFieldsGrow,
-		QtGui.QFormLayout.FieldGrowthPolicy.FieldsStayAtSizeHint,
-	]),
-	QtProperty(name='formAlignment',target='Layout',type=int,
-		flags=[Qt.AlignAbsolute,Qt.AlignBottom,Qt.AlignCenter,Qt.AlignHCenter,Qt.AlignJustify,Qt.AlignLeading,Qt.AlignLeft,Qt.AlignRight,Qt.AlignTop,Qt.AlignTrailing,Qt.AlignVCenter]
-	),
-	QtProperty(name='horizontalSpacing',target='Layout',type=int),
-	QtProperty(name='labelAlignment',target='Layout',type=int,
-		flags=[Qt.AlignAbsolute,Qt.AlignBottom,Qt.AlignCenter,Qt.AlignHCenter,Qt.AlignJustify,Qt.AlignLeading,Qt.AlignLeft,Qt.AlignRight,Qt.AlignTop,Qt.AlignTrailing,Qt.AlignVCenter]
-	),
-	QtProperty(name='rowWrapPolicy',target='Layout',options=[
-		QtGui.QFormLayout.RowWrapPolicy.DontWrapRows,
-		QtGui.QFormLayout.RowWrapPolicy.WrapAllRows,
-		QtGui.QFormLayout.RowWrapPolicy.WrapLongRows,
-	]),
-	QtProperty(name='spacing',type=int,target='Layout'),
-	QtProperty(name='verticalSpacing',type=int,target='Layout'),
-	QtProperty(name='contentsMargins',type=tuple,target='Layout',setter='setContentsMargins'),
-)
-
-
 
 #
 # Concrete fields
@@ -75,27 +7,20 @@ Properties.formLayout = Properties(
 
 		
 class _Form(base._AbstractGroup):
-	Name = 'Form'
 
 	QtClass = QtGui.QWidget
 
 	Properties = Properties(
+		base._AbstractGroup.Properties,
+		Properties.core,
 		Properties.formLayout,
 		Properties.widget,
-				
-		Property(name='name',type=str,required=True),
-		Property(name='contents',required=True),
 	)
-	
 
 	def __init__(self,parent,**kargs):
 		super(_Form,self).__init__(parent,**kargs)
 		self.groupData = True
-		
-	
-	def registerObject(self,field):
-		self.fields[field.name] = field
-		
+
 		
 	@property
 	def form(self):
@@ -103,6 +28,64 @@ class _Form(base._AbstractGroup):
 
 class Form(Factory):
 	klass = _Form
+
+
+
+class _TabbedForm(_Form):
+
+	QtClass = QtGui.QTabWidget
+
+	Properties = Properties(
+		base._AbstractGroup.Properties,
+		Properties.core,
+		Properties.widget,
+		
+		QtProperty(name='documentMode',type=bool),
+		QtProperty(name='moveable',type=bool),
+		QtProperty(name='tabsClosable',type=bool),
+		QtProperty(name='usesScrollButtons',type=bool),
+		QtProperty(name='elideMode',options=[
+			Qt.ElideLeft,Qt.ElideMiddle,Qt.ElideNone,Qt.ElideRight
+		]),
+		QtProperty(name='iconSize',type=QtCore.QSize),
+		QtProperty(name='tabPosition',options=[
+			QtGui.QTabWidget.North,QtGui.QTabWidget.South,QtGui.QTabWidget.East,QtGui.QTabWidget.West
+		]),
+		QtProperty(name='tabShape',options=[
+			QtGui.QTabWidget.Rounded,QtGui.QTabWidget.Triangular
+		]),
+	)
+
+	def layoutChildren(self):
+		for field in self._children.values():
+			icon = field.icon
+			if icon:
+				if not isinstance(field.icon,QtGui.QIcon):
+					icon = QtGui.QIcon(icon)
+				self._qt.addTab(field._qt,icon,field.label)
+			else:
+				self._qt.addTab(field._qt,field.label)
+
+class TabbedForm(Factory):
+	klass = _TabbedForm
+
+
+
+class _Tab(base._AbstractGroup):
+	
+	QtClass = QtGui.QWidget 
+	
+	Properties = Properties(
+		base._AbstractGroup.Properties,
+		Properties.core,
+		Properties.formLayout,
+		Properties.widget,
+		
+		Property(name='icon',type=object)
+	)
+
+class Tab(Factory):
+	klass = _Tab
 
 
 
@@ -253,7 +236,7 @@ class _ComboBox(BaseWidgetField):
 		
 		# Combo-box specific properties
 		QtProperty(name='editable',type=bool,getter='isEditable'),
-		QtProperty(name='duplicatesEnabled',type=bool,getter='isEditable'),
+		QtProperty(name='duplicatesEnabled',type=bool),
 		QtProperty(name='frame',type=bool,getter='hasFrame'),
 		QtProperty(name='iconSize',type=QtCore.QSize),
 		QtProperty(name='insertPolicy',type=int,options=[

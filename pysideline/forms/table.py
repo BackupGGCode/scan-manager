@@ -2,6 +2,17 @@ from .base import *
 import base
 import copy
 
+
+class TableAction:
+	Insert = 0x1
+	Delete = 0x2
+	Order = 0x4
+	Edit = Insert|Delete
+	All = Insert|Delete|Order
+	NoActions = 0x0
+		
+		
+		
 class ColumnDelegate(QtGui.QItemDelegate):
 	def __init__(self,column,*args,**kargs):
 		self.column = column
@@ -13,6 +24,7 @@ class ColumnDelegate(QtGui.QItemDelegate):
 		return editor._field.setValue(v)
 	def setModelData(self,editor,model,index):
 		model.setData(index,editor._field.getValue())
+		
 		
 
 class Column(Configurable):
@@ -31,6 +43,13 @@ class Column(Configurable):
 		
 		# Specialised proeprties
 		DescriptorProperty(name='editor'),
+
+		# Properties to be set on the vertical header for this column
+		Property(name='resizeMode',
+			options=[QtGui.QHeaderView.Interactive,QtGui.QHeaderView.Fixed,QtGui.QHeaderView.Stretch,QtGui.QHeaderView.ResizeToContents]
+		),
+		Property(name='hidden',type=bool),
+		
 	)
 	
 	def __init__(self,*args,**kargs):
@@ -103,7 +122,7 @@ class TableModel(QtCore.QAbstractTableModel):
 			return None
 		
 		column = self._columns[index.column()]
-		return self._data[index.row()][column.name]
+		return self._data[index.row()].get(column.name,NOTSET)
 
 	def headerData(self, section, orientation, role=Qt.DisplayRole):
 		if role != Qt.DisplayRole:
@@ -121,7 +140,7 @@ class TableModel(QtCore.QAbstractTableModel):
 			d = {}
 			for column in self._columns:
 				d[column.name] = NOTSET
-			self._data.insert(position + row, d)
+			self._data.insert(1 + position + row, d)
 
 		self.endInsertRows()
 		return True
@@ -165,38 +184,20 @@ class TableModel(QtCore.QAbstractTableModel):
 		flags = 0
 		column = self._columns[index.column()]
 		if column.editable:
-			flags = Qt.ItemIsEditable
+			flags |= Qt.ItemIsEditable
 		if column.selectable:
-			flags = Qt.ItemIsSelectable
+			flags |= Qt.ItemIsSelectable
 		if column.checkable:
-			flags = Qt.ItemIsUserCheckable
+			flags |= Qt.ItemIsUserCheckable
 		if column.enabled:
-			flags = Qt.ItemIsEnabled
+			flags |= Qt.ItemIsEnabled
 		if column.tristate:
-			flags = Qt.ItemIsTristate
+			flags |= Qt.ItemIsTristate
 
 		return Qt.ItemFlags(QtCore.QAbstractTableModel.flags(self, index) | flags)
 	
-	def __setitem__(self,row,v):
-		self._data[row] = v
-		tl = self.index(row,0)
-		br = self.index(row,len(self._columns)-1)
-		self.dataChanged.emit(tl,br)
-	
-	def __getitem__(self,row):
-		return self._data[row]
-	
-	def append(self,data):
-		#rowData = DataRow(self,**data)
-		#self._data.append(rowData)
-		self._data.append(data)
-		
 	def fromList(self,l):
 		rowsBefore = len(self._data)
-		#self._data = []
-		#for item in l:
-		#	row = DataRow(self,**item)
-		#	self._data.append(row)
 		self._data = l
 		tl = self.index(0,0)
 		br = self.index(max(rowsBefore-1,len(self._data)-1),len(self._columns)-1)
@@ -206,7 +207,37 @@ class TableModel(QtCore.QAbstractTableModel):
 		#out = [i._toDict() for i in self._data]
 		return self._data
 	
+	#
+	# Python sequence behaviour
+	# 
 
+	def __setitem__(self,row,v):
+		self._data[row] = v
+		tl = self.index(row,0)
+		br = self.index(row,len(self._columns)-1)
+		self.dataChanged.emit(tl,br)
+	
+	def __getitem__(self,row):
+		return self._data[row]
+	
+	def __delitem__(self,row):
+		self.beginRemoveRows(QtCore.QModelIndex(), row, row)
+		del self._data[row]
+		self.endRemoveRows()
+		
+	def __len__(self):
+		return len(self._data)
+	
+	def append(self,data):
+		self.beginInsertRows(QtCore.QModelIndex(), len(self._data), len(self._data))
+		self._data.append(data)
+		self.endInsertRows()
+		
+	def insert(self,position,data):
+		self.beginInsertRows(QtCore.QModelIndex(), position, position)
+		self._data.insert(position,data)
+		self.endInsertRows()
+		
 
 class TableViewWidget(BaseWidget,QtGui.QWidget):
 
@@ -218,11 +249,25 @@ class TableViewWidget(BaseWidget,QtGui.QWidget):
 			self.Form._field = subField
 			self.Layout.addWidget(self.Form)
 			self.Form.setDisabled(True)
+		else:
+			self.Form = None
+			
+		toolbar = self.TableContainer.Toolbar
+		field = self._field
+
+		toolbar.actionInsert.setVisible(field.tableActions & TableAction.Insert)
+		toolbar.actionDelete.setVisible(field.tableActions & TableAction.Delete)
+		toolbar.actionTop.setVisible(field.tableActions & TableAction.Order)
+		toolbar.actionUp.setVisible(field.tableActions & TableAction.Order)
+		toolbar.actionDown.setVisible(field.tableActions & TableAction.Order)
+		toolbar.actionBottom.setVisible(field.tableActions & TableAction.Order)
+		toolbar.setHidden(field.tableActions == TableAction.NoActions)
 
 	class Layout(BaseLayout,QtGui.QHBoxLayout):
 		
 		def init(self):
 			self.setContentsMargins(0,0,0,0)
+			self.setSpacing(0)
 			self._up.setLayout(self)
 			self._up.Table = self._up.TableContainer.Table
 			
@@ -231,11 +276,13 @@ class TableViewWidget(BaseWidget,QtGui.QWidget):
 		class Layout(BaseLayout,QtGui.QVBoxLayout):
 			def init(self):
 				self.setContentsMargins(0,0,0,0)
+				self.setSpacing(0)
 				self._up.setLayout(self)
 		
 		class Toolbar(BaseWidget,QtGui.QToolBar):
 			def init(self):
 				self._up.Layout.addWidget(self)
+				
 				self.actionInsert = self.addAction(QtGui.QIcon(':/plus-16.png'),'')
 				self.actionDelete = self.addAction(QtGui.QIcon(':/minus-16.png'),'')
 				self.actionUp = self.addAction(QtGui.QIcon(':/up-16.png'),'')
@@ -243,35 +290,74 @@ class TableViewWidget(BaseWidget,QtGui.QWidget):
 				self.actionDown = self.addAction(QtGui.QIcon(':/down-16.png'),'')
 				self.actionBottom = self.addAction(QtGui.QIcon(':/bottom-16.png'),'')
 				self.setIconSize(QtCore.QSize(16,16))
-				
+					
 			def onactionTriggered(self,action):
-				field = self._up._up._field
+				
+				if action not in (self.actionInsert,self.actionDelete,self.actionUp,self.actionTop,self.actionDown,self.actionBottom):
+					return
+				
 				model = self._up._up._field.model
 				view = self._up.Table
 				index = view.currentIndex()
+				
+				view.saveForm(view.currentSelection)
+
+				row = index.row()
+				
 				if action == self.actionInsert:
-					model.insertRows(position=index.row(),index=index,rows=1)
-				elif action == self.actionDelete:
-					if index.isValid():
-						model.removeRow(position=index.row(),index=index)
-						new = view.currentIndex()
-						if new and new.isValid():
-							view.currentSelection = new
-							view.showRow(new)
-						else:
-							view.currentSelection = None
-							view.clearForm()
-				elif action == self.actionUp:
-					model = self._up._up._field.model
-					view = self._up.Table
-					x = index.row()
-					if x == 0:
-						return
-					d = model[x-1]
-					model[x-1] = model[x]
-					model[x] = d
 					view.currentSelection = None
-					view.selectRow(x-1)
+					view.clearForm()
+					model.insertRows(row,1)
+					view.selectRow(row+1)
+					view.currentSelection = model.index(row+1,0)
+					
+				if not index.isValid():
+					return
+				
+				if action == self.actionDelete:
+					del(model[row])
+					new = view.currentIndex()
+					if new and new.isValid():
+						view.currentSelection = new
+						view.showRow(new)
+					else:
+						view.currentSelection = None
+						view.clearForm()
+						view.disableForm()
+				elif action == self.actionUp:
+					if row == 0:
+						return
+					d = model[row-1]
+					model[row-1] = model[row]
+					model[row] = d
+					view.currentSelection = None
+					view.selectRow(row-1)
+				elif action == self.actionDown:
+					if row >= (len(model)-1):
+						return
+					d = model[row+1]
+					model[row+1] = model[row]
+					model[row] = d
+					view.currentSelection = None
+					view.selectRow(row+1)
+				elif action == self.actionTop:
+					if row == 0:
+						return
+					d = model[row]
+					del(model[row])
+					model.insert(0,d)
+					view.currentSelection = None
+					view.selectRow(0)
+				elif action == self.actionBottom:
+					if row >= (len(model)-1):
+						return
+					d = model[row]
+					del(model[row])
+					model.append(d)
+					view.currentSelection = None
+					view.selectRow(len(model)-1)
+				else:
+					return
 				
 	
 		class Table(BaseWidget,QtGui.QTableView):
@@ -281,14 +367,13 @@ class TableViewWidget(BaseWidget,QtGui.QWidget):
 				
 			def currentChanged(self,current,previous):
 				super(TableViewWidget.TableContainer.Table,self).currentChanged(current,previous)
-				form = self._up._up.Form
-				model = self.model()
 				if current == self.currentSelection:
 					return
 				if self.currentSelection:
 					self.saveForm(self.currentSelection)
 				if current is None or not current.isValid():
 					self.clearForm()
+					self.disableForm()
 					self.currentSelection = None
 					return
 				self.showRow(current)
@@ -304,10 +389,16 @@ class TableViewWidget(BaseWidget,QtGui.QWidget):
 			#
 			
 			def clearForm(self):
+				if not self._up._up.Form: return 
 				self._up._up.Form._field.clear()
+
+			def disableForm(self):
+				if not self._up._up.Form: return 
 				self._up._up.Form.setDisabled(True)
 
 			def showRow(self,index):
+				if not self._up._up.Form: return 
+				self.clearForm()
 				model = self.model()
 				form = self._up._up.Form
 				value = FormData(**model[index.row()])
@@ -315,6 +406,7 @@ class TableViewWidget(BaseWidget,QtGui.QWidget):
 				form.setDisabled(False)
 				
 			def saveForm(self,index):
+				if not self._up._up.Form: return 
 				if index is None or not index.isValid():
 					return
 				model = self.model()
@@ -330,7 +422,6 @@ class _TableView(BaseWidgetField):
 	
 	Properties = Properties(
 		
-		base._AbstractGroup.Properties,
 		Properties.core,
 		Properties.widget,
 
@@ -397,17 +488,26 @@ class _TableView(BaseWidgetField):
 		# Other properties
 		Property(name='columns',required=True,type=list,subType=Column),
 		Property(name='editForm',required=True),
+		Property(name='tableActions',default=TableAction.NoActions,flags=[
+			TableAction.Insert,TableAction.Delete,TableAction.Order
+		])
 	)
 	
 	def init(self):
 		self.model = TableModel(self.columns)
-		self._qt.Table.setModel(self.model)
+		table = self._qt.Table
+		table.setModel(self.model)
 
 		for index,column in enumerate(self.columns):
 			delegate = column.createDelegate(self._qt)
 			if not delegate:
 				continue
-			self._qt.Table.setItemDelegateForColumn(index,delegate)
+			table.setItemDelegateForColumn(index,delegate)
+			if column.resizeMode is not NOTSET:
+				table.horizontalHeader().setResizeMode(index,column.resizeMode)
+			if column.hidden is not NOTSET:
+				table.horizontalHeader().setSectionHidden(index,column.hidden)
+		
 		
 	def getValue(self):
 		if self._qt.Table.currentSelection:
@@ -423,4 +523,3 @@ class _TableView(BaseWidgetField):
 			
 class TableView(Factory):
 	klass = _TableView
-

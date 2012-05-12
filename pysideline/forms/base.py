@@ -52,6 +52,7 @@ class FormData(object):
 		return self.__dict__.items()
 
 
+
 class Factory(object):
 	
 	def __init__(self,*args,**kargs):
@@ -80,6 +81,8 @@ class _Properties(object):
 		
 		for propertyFactory in expandedArgs:
 			property = propertyFactory(field,self)
+			if property.name in self.contents:
+				raise Exception('Property %s already exists in %s'%(property.name,self.field.__class__.__name__))
 			self.contents[property.name] = property
 
 	
@@ -366,6 +369,74 @@ class Configurable(object):
 		self.__dict__[k] = v
 
 #
+# Common properties
+#
+
+Properties.core = Properties(
+	# Core properies
+	Property(name='name',type=str,required=True),
+	Property(name='label',type=str),
+	Property(name='depends',type=list,subType=str),
+)
+	
+Properties.widget = Properties(
+	# General widget properties
+	QtProperty(name='styleSheet',type=str),
+	QtProperty(name='enabled',type=bool),
+	QtProperty(name='font',type=object),
+	QtProperty(name='visible',type=object),
+	QtProperty(name='graphicsEffect',type=object),
+	QtProperty(name='inputMethodHints',type=object,
+		options=[Qt.ImhDialableCharactersOnly,Qt.ImhDigitsOnly,Qt.ImhEmailCharactersOnly,Qt.ImhExclusiveInputMask,
+				 Qt.ImhFormattedNumbersOnly,Qt.ImhHiddenText,Qt.ImhLowercaseOnly,Qt.ImhNoAutoUppercase,Qt.ImhNoPredictiveText,
+				 Qt.ImhPreferLowercase,Qt.ImhPreferNumbers,Qt.ImhPreferUppercase,Qt.ImhUppercaseOnly,Qt.ImhUrlCharactersOnly]),
+	QtProperty(name='whatsThis',type=str),
+	QtProperty(name='toolTip',type=str),
+
+	# General widget properties (size)
+	QtProperty(name='fixedWidth',type=object),
+	QtProperty(name='fixedHeight',type=object),
+	QtProperty(name='minimumWidth',type=object),
+	QtProperty(name='minimumHeight',type=object),
+)
+
+
+Properties.valueField = Properties(
+	# General value-field properties
+	Property(name='type'),
+	Property(name='default'),
+	Property(name='validate'),
+	Property(name='required',type=bool),
+)		
+
+
+Properties.formLayout = Properties(
+	# Form layout properties
+	QtProperty(name='fieldGrowthPolicy',target='Layout',options=[
+		QtGui.QFormLayout.FieldGrowthPolicy.AllNonFixedFieldsGrow,
+		QtGui.QFormLayout.FieldGrowthPolicy.ExpandingFieldsGrow,
+		QtGui.QFormLayout.FieldGrowthPolicy.FieldsStayAtSizeHint,
+	]),
+	QtProperty(name='formAlignment',target='Layout',type=int,
+		flags=[Qt.AlignAbsolute,Qt.AlignBottom,Qt.AlignCenter,Qt.AlignHCenter,Qt.AlignJustify,Qt.AlignLeading,Qt.AlignLeft,Qt.AlignRight,Qt.AlignTop,Qt.AlignTrailing,Qt.AlignVCenter]
+	),
+	QtProperty(name='horizontalSpacing',target='Layout',type=int),
+	QtProperty(name='labelAlignment',target='Layout',type=int,
+		flags=[Qt.AlignAbsolute,Qt.AlignBottom,Qt.AlignCenter,Qt.AlignHCenter,Qt.AlignJustify,Qt.AlignLeading,Qt.AlignLeft,Qt.AlignRight,Qt.AlignTop,Qt.AlignTrailing,Qt.AlignVCenter]
+	),
+	QtProperty(name='rowWrapPolicy',target='Layout',options=[
+		QtGui.QFormLayout.RowWrapPolicy.DontWrapRows,
+		QtGui.QFormLayout.RowWrapPolicy.WrapAllRows,
+		QtGui.QFormLayout.RowWrapPolicy.WrapLongRows,
+	]),
+	QtProperty(name='spacing',type=int,target='Layout'),
+	QtProperty(name='verticalSpacing',type=int,target='Layout'),
+	QtProperty(name='contentsMargins',type=tuple,target='Layout',setter='setContentsMargins'),
+)
+
+
+
+#
 # Fields
 #
 
@@ -519,7 +590,7 @@ class BaseWidgetField(BaseField):
 					value = int(v)
 				except:
 					error = "must be an integer"
-		if self.type is float:
+		elif self.type is float:
 			if v:
 				try:
 					value = float(v)
@@ -541,46 +612,41 @@ class BaseWidgetField(BaseField):
 class _AbstractGroup(BaseWidgetField):
 	
 	Properties = Properties(
-		Property(name='name',type=str,required=True),
 		Property(name='contents',required=True),
 		Property(name='groupData',type=bool,default=False),
 	)
 	
 	
 	def __init__(self,parent,**kargs):
-		self.parent = parent
-		self.fields = {}
-		super(_AbstractGroup,self).__init__(parent=None,**kargs)
+		self._fields = {}
+		super(_AbstractGroup,self).__init__(parent=parent,**kargs)
 		self._children = collections.OrderedDict([(i.name,i) for i in [fieldFactory(self) for fieldFactory in self.contents]])
 		
 		
 	def registerObject(self,field):
-		self.fields[field.name] = field
+		self._fields[field.name] = field
 		p = self.parent
 		while 1:
 			if p is None:
 				break
 			if hasattr(p,'registerObject'):
 				p.registerObject(field)
+				break # other parents will be taken care of automatically now
 			p = p.parent
 		
 		
 	def getField(self,k):
-		return self.fields[k]
+		return self._fields[k]
 
 	
 	def create(self,qparent):
 		
 		super(_AbstractGroup,self).create(qparent)
-		self._layout = QtGui.QFormLayout()
-		self._qt.setLayout(self._layout)
-		
+
 		for field in self._children.values():
 			field.create(self._qt)
-			if getattr(field,'label',None):
-				self._layout.addRow(field.label,field._qt)
-			else:
-				self._layout.addRow(field._qt)
+		
+		self.layoutChildren()
 
 		for field in self._children.values():
 			# must be done after everything is instantiated/registered
@@ -591,11 +657,19 @@ class _AbstractGroup(BaseWidgetField):
 		
 		return self._qt
 
+	
+	def layoutChildren(self):
+		self._layout = QtGui.QFormLayout()
+		self._qt.setLayout(self._layout)
+		
+		for field in self._children.values():
+			if getattr(field,'label',None):
+				self._layout.addRow(field.label,field._qt)
+			else:
+				self._layout.addRow(field._qt)
+
 		
 	def getValue(self):
-		
-		if not self.groupData:
-			return NOTSTORED
 		
 		data = FormData()
 		
@@ -630,3 +704,22 @@ class _AbstractGroup(BaseWidgetField):
 		return self
 
 
+
+class _AbstractGroupGrid(_AbstractGroup):
+
+	def layoutChildren(self):
+		self._layout = QtGui.QGridLayout()
+		self._qt.setLayout(self._layout)
+		
+		for field in self._children.values():
+			row = self._layout.rowCount()
+			if getattr(field,'label',None):
+				field._label = QtGui.QLabel()
+				field._label.setText(field.label)
+				field._label.setBuddy(field._qt)
+				self._layout.addWidget(field._label,row,0)
+				self._layout.addWidget(field._qt,row,1,field.rowSpan,(2*field.colSpan)-1)
+			else:
+				self._layout.addWidget(field._qt,row,0,field.rowSpan,(2*field.colSpan))
+
+		
