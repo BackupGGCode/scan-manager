@@ -23,33 +23,46 @@ class ConfigurationError(Exception):
 	pass
 
 
+
 class FormData(object):
 	
 	def __init__(self,**kargs):
-		self.__dict__.update(kargs)
+		self.__dict__['_data'] = kargs
+		self.__dict__['_errors'] = {}
 	
 	
-	def setValue(self,k,v):
-		self.__dict__[k] = v
+	def _setValue(self,k,v):
+		self._data[k] = v
+	
+	
+	def _setError(self,k,v):
+		self._errors[k] = v
 	
 		
-	def __setattr__(self,k,v):
-		raise AttributeError(k)
-
-
 	def _pp(self,indent=''):
 		s = ''
 		s += indent + '<%s>\n'%self.__class__.__name__
-		for k,v in self.items():
+		for k,v in self._items():
 			if isinstance(v,FormData):
 				s += indent + '  %s:\n'%k
 				s += v._pp(indent + '	')
 			else:
-				s += indent + '  %s=%r\n'%(k,v)
+				error = ''
+				if k in self._errors:
+					 error = '[%s]'%self._errors[k]
+				s += indent + '  %s=%r %s\n'%(k,v,error)
 		return s
 	
-	def items(self):
-		return self.__dict__.items()
+	def _items(self):
+		return self._data.items()
+
+	def __getattr__(self,k):
+		return self._data[k]
+	
+	def __setattr__(self,k,v):
+		if k not in self._data:
+			raise AttributeError(k)
+		self._data[k] = v 
 
 
 
@@ -71,19 +84,26 @@ class _Properties(object):
 		self.field = field
 		self.contents = collections.OrderedDict()
 		
-		expandedArgs = []
-		for i in args:
-			# if any L{Properties} objects are included in args expand them into a set of L{Property} objects
-			if isinstance(i,Properties):
-				expandedArgs += i.args
-			else:
-				expandedArgs.append(i)
+		expandedArgs = self.expandArgs(args)
 		
 		for propertyFactory in expandedArgs:
 			property = propertyFactory(field,self)
 			if property.name in self.contents:
 				raise Exception('Property %s already exists in %s'%(property.name,self.field.__class__.__name__))
 			self.contents[property.name] = property
+			
+			
+	def expandArgs(self,args):
+		"""
+		If any L{Properties} objects are included in args expand them into a set of L{Property} objects
+		"""
+		out = []
+		for i in args:
+			if isinstance(i,Properties):
+				out += self.expandArgs(i.args)
+			else:
+				out.append(i)
+		return out
 
 	
 	def keys(self):
@@ -96,6 +116,12 @@ class _Properties(object):
 	
 	def items(self):
 		return self.contents.items()
+	
+	
+	def getDefaultEvent(self):
+		for i in self.contents:
+			if isinstance(i,EventProperty) and getattr(i,'default',None):
+				return i
 
 
 	def __getitem__(self,k):
@@ -168,15 +194,27 @@ class _Property(object):
 		else:
 			self.recalculable = False
 			
-		# Validate the property supplied
+		# Validate the value type (if a type was specified)
 		if hasattr(self,'type'):
-			if self.type is str and type(v) not in (unicode,str):
-				self.configurationError('must be a string/unicode value')
+			# special shortcuts for certain Qt types 
+			if self.type is QtCore.QSize and type(v) is tuple:
+				v = QtCore.QSize(*v)
+			elif self.type is QtCore.QMargins and type(v) is tuple:
+				v = QtCore.QMargins(*v)
+			elif self.type is QtGui.QIcon and type(v) in (str,unicode):
+				v = QtGui.QIcon(v)
+			
+			# check base type
+			if self.type in (unicode,str):
+				if type(v) not in (unicode,str):
+					self.configurationError('must be a string/unicode value')
 			elif self.type is callable:
 				if not callable(v):
 					self.configurationError('must be a callable object')
 			elif not isinstance(v,self.type):
 				self.configurationError('must be of type %r'%self.type)
+			
+			# check sub-type for lists/tuples
 			if self.type in (tuple,list) and hasattr(self,'subType'):
 				if type(self.subType) in (tuple,list):
 					if len(self.subType) != len(v):
@@ -187,7 +225,7 @@ class _Property(object):
 				else:
 					for index,i in enumerate(v):
 						if not isinstance(i,self.subType):
-							self.configurationError('index %d should be of type %r'%(index,self.subType))
+							self.configurationError('item at index %d should be of type %r'%(index,self.subType))
 							
 		if hasattr(self,'options'):
 			if v not in self.options:
@@ -202,6 +240,10 @@ class _Property(object):
 	def configurationError(self,text):
 			raise ConfigurationError('%s in %s object %s %s'%(self.name,self.properties.field.__class__.__name__[1:],getattr(self.properties.field,'name',self.properties.field),text))
 
+	def __repr__(self):
+		valueS = ', '.join(['name=%s.%s'%(self.field.name,self.name)] + ['%s=%r'%(k,v) for k,v in self.__dict__.items() if k != 'name'])
+		return '<%s %s>'%(self.__class__.__name__,valueS)
+	
 class Property(Factory):
 	klass = _Property
 
@@ -300,6 +342,14 @@ class EventPropertyHandler(object):
 class _EventProperty(_Property):
 	
 	def connect(self,q):
+		
+		if getattr(self,'target',None):
+			for i in self.target.split('.'):
+				if i.endswith('()'):
+					q = getattr(q,i[:-2])()
+				else:
+					q = getattr(q,i)
+					
 		signalName = getattr(self,'signal',None)
 		if not signalName:
 			signalName = self.name
@@ -310,7 +360,7 @@ class _EventProperty(_Property):
 
 	def notify(self,fieldName,propertyName):
 		self.handler.toSignal.append((fieldName,propertyName))
-	
+		
 class EventProperty(Factory):
 	klass = _EventProperty
 
@@ -377,13 +427,16 @@ Properties.core = Properties(
 	Property(name='name',type=str,required=True),
 	Property(name='label',type=str),
 	Property(name='depends',type=list,subType=str),
+	Property(name='klass',type=type),
+	Property(name='labelIcon',type=QtGui.QIcon),
 )
 	
 Properties.widget = Properties(
 	# General widget properties
 	QtProperty(name='styleSheet',type=str),
 	QtProperty(name='enabled',type=bool),
-	QtProperty(name='font',type=object),
+	QtProperty(name='hidden',type=bool,getter='_get_hidden',setter='_set_hidden',target='_field'),
+	QtProperty(name='font',type=QtGui.QFont),
 	QtProperty(name='visible',type=object),
 	QtProperty(name='graphicsEffect',type=object),
 	QtProperty(name='inputMethodHints',type=object,
@@ -394,10 +447,15 @@ Properties.widget = Properties(
 	QtProperty(name='toolTip',type=str),
 
 	# General widget properties (size)
-	QtProperty(name='fixedWidth',type=object),
-	QtProperty(name='fixedHeight',type=object),
-	QtProperty(name='minimumWidth',type=object),
-	QtProperty(name='minimumHeight',type=object),
+	QtProperty(name='fixedSize',type=QtCore.QSize),
+	QtProperty(name='fixedWidth',type=int),
+	QtProperty(name='fixedHeight',type=int),
+	QtProperty(name='minimumSize',type=QtCore.QSize),
+	QtProperty(name='minimumWidth',type=int),
+	QtProperty(name='minimumHeight',type=int),
+	QtProperty(name='maximumSize',type=QtCore.QSize),
+	QtProperty(name='maximumWidth',type=int),
+	QtProperty(name='maximumHeight',type=int),
 )
 
 
@@ -405,7 +463,7 @@ Properties.valueField = Properties(
 	# General value-field properties
 	Property(name='type'),
 	Property(name='default'),
-	Property(name='validate'),
+	Property(name='validate',type=callable),
 	Property(name='required',type=bool),
 )		
 
@@ -431,7 +489,7 @@ Properties.formLayout = Properties(
 	]),
 	QtProperty(name='spacing',type=int,target='Layout'),
 	QtProperty(name='verticalSpacing',type=int,target='Layout'),
-	QtProperty(name='contentsMargins',type=tuple,target='Layout',setter='setContentsMargins'),
+	QtProperty(name='contentsMargins',type=QtCore.QMargins,target='Layout',setter='setContentsMargins'),
 )
 
 
@@ -454,32 +512,40 @@ class BaseField(Configurable):
 			self.group.registerObject(self)
 
 
-	def connectDependencies(self):		
+	def connectDependencies(self):
+				
 		depends = self.depends
+		
 		if depends is NOTSET:
 			return
+		
 		if type(depends) not in (list,tuple):
-			depends= [depends]
+			depends = [depends]
+			
 		for item in depends:
 			if '=' in item:
 				# "myProperty=myOtherField.someEvent"
 				propertyName = item.split('=')[0]
 				rest = item.split('=')[1]
 				fieldName,eventName = rest.split('.')
+				field = self.form.getField(fieldName)
+				event = field._properties[eventName]
 			else:
 				# "myOtherField.someEvent"
 				propertyName = None
-				fieldName,eventName = item.split('.')
+				if '.' in item:
+					fieldName,eventName = item.split('.')
+					field = self.form.getField(fieldName)
+					event = field._properties[eventName]
+				else:
+					field = self.form.getField(item)
+					event = field._properties.getDefaultEvent()
+					if event is None:
+						raise self._properties['depends'].configurationError('dependency %r -- field %s has no default event'%(item,field.name))
 				
-			field = self.form.getField(fieldName)
-			event = field._properties[eventName]
 			event.notify(self.name,propertyName)
 			
 		
-	def setError(self,error):
-		self.error = error
-		
-	
 	def __getattr__(self,k):
 		if '_properties' in self.__dict__ and k in self._properties:
 			# used for every field
@@ -530,13 +596,15 @@ class QuickValidator(QtGui.QValidator):
 		else:
 			raise ConfigurationError('validator must return True, False or None')
 
-	
+
 
 class BaseWidgetField(BaseField):
 
 	def create(self,qparent):
 		
-		self._qt = self.QtClass()
+		klass = getattr(self,'klass',NOTSET) or self.QtClass 
+		
+		self._qt = klass()
 		self._qt._field = self
 		self._qt.setParent(qparent)
 
@@ -581,31 +649,76 @@ class BaseWidgetField(BaseField):
 		
 	
 	def qtToValue(self,v):
-		### TODO: Not sure if this should handle errors at all -- user can supply a validator for it, but it is good to have a shortcut too...
+		type = getattr(self,'type',None)
 		error = None
 		value = None
-		if self.type is int:
-			if v:
+		if type is int:
+			if v and type(v) is not int:
 				try:
 					value = int(v)
 				except:
 					error = "must be an integer"
-		elif self.type is float:
-			if v:
+		elif type is float:
+			if v and type(v) is not float:
 				try:
 					value = float(v)
 				except:
 					error = "must be an number" 
-		elif self.type is unicode:
-			if v is not None:
-				value = unicode(v)
-		elif self.type is str:
-			if v is not None:
+		elif type is unicode:
+			if v and type(v) is not unicode:
+				try:
+					value = unicode(v)
+				except:
+					error = "could not convert to unicode"
+		elif type is str:
+			if v and type(v) is not str:
 				value = str(v)
 		else:
 			value = v
 		
+		if getattr(self,'required',False) and not value:
+			error = 'a value is required'
+
 		return error,value
+	
+	
+	def getValue(self):
+		qtValue = self.getRawValue()
+		error,value = self.qtToValue(qtValue)
+		if not error and getattr(self,'validate',None):
+			error = self.validate(value)
+		
+		if error:
+			self.markError(error)
+		else:
+			self.clearError()
+		return error,value
+
+
+	def setValue(self,v):
+		self.setRawValue(v)
+
+	
+	def markError(self,error):
+		if getattr(self,'_label',None):
+			self._label.setStyleSheet('.%s { color: red; }'%self._label.__class__.__name__)
+		self._qt.setStyleSheet('.%s { background: #FF9999; }'%self._qt.__class__.__name__)
+
+	
+	def clearError(self):
+		if getattr(self,'_label',None):
+			self._label.setStyleSheet('')
+		self._qt.setStyleSheet('')
+		
+	
+	def _set_hidden(self,v):
+		self._qt.setHidden(v)
+		if getattr(self,'_label',None):
+			self._label.setHidden(v)
+			
+			
+	def _get_hidden(self):
+		return self._qt.isHidden()
 		
 
 
@@ -641,12 +754,41 @@ class _AbstractGroup(BaseWidgetField):
 	
 	def create(self,qparent):
 		
-		super(_AbstractGroup,self).create(qparent)
+		# Create the main Qt widget
+		
+		klass = getattr(self,'klass',NOTSET) or self.QtClass 
+		
+		self._qt = klass()
+		self._qt._field = self
+		self._qt.setParent(qparent)
 
+		# Now create the children and arrange them in a layout
+		
 		for field in self._children.values():
 			field.create(self._qt)
 		
 		self.layoutChildren()
+		
+		# Set any generic Qt properties on the main widget and connect its events
+
+		for property in self._properties:
+			if isinstance(property,_QtProperty):
+				if not property.recalculable: 
+					property.toQt(self._qt)
+			if isinstance(property,_EventProperty):
+				property.connect(self._qt)
+
+		# Exceute post-creation hooks
+
+		if hasattr(self._qt,'afterCreate'):
+			self._qt.afterCreate()
+
+		# Initialize the control
+			
+		self.init()
+		
+		# Now hook up any dependencies and calculate the actual values of any properties that were passsed in as callable objects 
+		# (we do this last to allow these functions to reference as many other fields/properties as possible) 
 
 		for field in self._children.values():
 			# must be done after everything is instantiated/registered
@@ -654,50 +796,71 @@ class _AbstractGroup(BaseWidgetField):
 
 		for field in self._children.values():
 			field.recalculate()
+			
+		# And finally return the newly created object
 		
 		return self._qt
 
 	
 	def layoutChildren(self):
-		self._layout = QtGui.QFormLayout()
-		self._qt.setLayout(self._layout)
+		self._qt.Layout = QtGui.QFormLayout()
+		self._qt.setLayout(self._qt.Layout)
 		
 		for field in self._children.values():
 			if getattr(field,'label',None):
-				self._layout.addRow(field.label,field._qt)
+				self._qt.Layout.addRow(field.label,field._qt)
+				field._label = self._qt.Layout.labelForField(field._qt)
 			else:
-				self._layout.addRow(field._qt)
+				self._qt.Layout.addRow(field._qt)
+				field._label = None 
 
 		
 	def getValue(self):
 		
 		data = FormData()
+		hasErrors = False
 		
 		for field in self._children.values():
-			value = field.getValue()
+			error,value = field.getValue()
 			if value is NOTSTORED:
 				continue
 			if isinstance(value,FormData) and not field.groupData:
-				for k,v in value.items():
-					data.setValue(k,v)
+				data._data.update(value._data)
+				data._errors.update(value._errors)
 			else:
-				data.setValue(field.name,field.getValue())
+				data._setValue(field.name,value)
+				if error:
+					data._setError(field.name,error)
 		
-		return data
+		if data._errors:
+			hasErrors = True
+		
+		if hasErrors:
+			self.markError(None)
+		else:
+			self.clearError()
+		
+		return hasErrors,data
 
 		
 	def setValue(self,v):
 		if not self.groupData:
 			raise Exception('Cannot set value for group (%s) unless groupData is True'%self.name)
 		
-		for k,v in v.items():
+		for k,v in v._items():
 			self.getField(k).setValue(v)
 
 
 	def clear(self):
 		for child in self._children.values():
 			child.clear()
-		
+
+	def markError(self,error):
+		return
+
+	
+	def clearError(self):
+		return
 
 	@property
 	def group(self):
@@ -706,20 +869,19 @@ class _AbstractGroup(BaseWidgetField):
 
 
 class _AbstractGroupGrid(_AbstractGroup):
-
+	
 	def layoutChildren(self):
-		self._layout = QtGui.QGridLayout()
-		self._qt.setLayout(self._layout)
+		self._qt.Layout = QtGui.QGridLayout()
+		self._qt.setLayout(self._qt.Layout)
 		
 		for field in self._children.values():
-			row = self._layout.rowCount()
+			row = self._qt.Layout.rowCount()
 			if getattr(field,'label',None):
 				field._label = QtGui.QLabel()
 				field._label.setText(field.label)
 				field._label.setBuddy(field._qt)
-				self._layout.addWidget(field._label,row,0)
-				self._layout.addWidget(field._qt,row,1,field.rowSpan,(2*field.colSpan)-1)
+				self._qt.Layout.addWidget(field._label,row,0)
+				self._qt.Layout.addWidget(field._qt,row,1,field.rowSpan,(2*field.colSpan)-1)
 			else:
-				self._layout.addWidget(field._qt,row,0,field.rowSpan,(2*field.colSpan))
-
-		
+				self._qt.Layout.addWidget(field._qt,row,0,field.rowSpan,(2*field.colSpan))
+				field._label = None

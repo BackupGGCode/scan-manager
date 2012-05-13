@@ -1,6 +1,9 @@
 from .base import *
 import base
 import copy
+import cPickle
+
+__all__ = ['TableView','TableAction','FormPosition','Column']
 
 
 class TableAction:
@@ -10,6 +13,14 @@ class TableAction:
 	Edit = Insert|Delete
 	All = Insert|Delete|Order
 	NoActions = 0x0
+		
+		
+		
+class FormPosition:
+	Top = 1
+	Bottom = 2
+	Left = 3
+	Right = 4
 		
 		
 		
@@ -23,7 +34,7 @@ class ColumnDelegate(QtGui.QItemDelegate):
 		v = index.model().data(index)
 		return editor._field.setValue(v)
 	def setModelData(self,editor,model,index):
-		model.setData(index,editor._field.getValue())
+		model.setData(index,editor._field.getValue()[1])
 		
 		
 
@@ -63,38 +74,6 @@ class Column(Configurable):
 			return ColumnDelegate(self,parent)
 
 
-
-class DataRow(object):
-	""" A row object that notifies its parent table of updates to any column values """
-	
-	def __init__(self,parent,**kargs):
-		self.__dict__['_parent'] = parent
-		self.__dict__['_data'] = kargs	
-	
-	def __getitem__(self,k):
-		if k in self.data:
-			return self.data[k]
-		
-	def __setitem__(self,k,v):
-		for columnIndex,column in self.parent._columns:
-			if column.name == k:
-				break
-		else:
-			raise Exception('unknown column %s'%k)
-			
-		self._data[k] = v
-		index = self.parent.index(self.parent._data.index(self),columnIndex)
-		self.parent.dataChanged.emit(index, index)
-		
-	def __getattr__(self,k):
-		return self[k]
-	
-	def __setattr__(self,k,v):
-		self[k] = v
-		
-	def _toDict(self):
-		return copy.copy(self._data)
-		
 
 class TableModel(QtCore.QAbstractTableModel):
 
@@ -193,8 +172,43 @@ class TableModel(QtCore.QAbstractTableModel):
 			flags |= Qt.ItemIsEnabled
 		if column.tristate:
 			flags |= Qt.ItemIsTristate
+			
+		flags |= QtCore.Qt.ItemIsDragEnabled 
+		flags |= QtCore.Qt.ItemIsDropEnabled 
 
 		return Qt.ItemFlags(QtCore.QAbstractTableModel.flags(self, index) | flags)
+	
+	#
+	# Drag and drop behaviour (for reordering, primarily)
+	#
+	
+	def supportedDropActions(self): 
+		return QtCore.Qt.CopyAction | QtCore.Qt.MoveAction	
+	
+	def mimeTypes(self):
+		return ['application/x-pickle']
+
+	def mimeData(self, indexes):
+		data = QtCore.QMimeData()
+		data.setData('application/x-pickle', cPickle.dumps([(i.row(),i.column()) for i in indexes]))
+		return data
+
+	def dropMimeData(self, data, action, row, column, parent):
+		data = cPickle.loads(str(data.data('application/x-pickle')))
+		sourceRow = data[0][0]
+		targetRow = parent.row()
+		if action == QtCore.Qt.DropAction.MoveAction:
+			d = self[sourceRow]
+			del(self[sourceRow])
+			self.insert(targetRow,d)
+		elif action == QtCore.Qt.DropAction.CopyAction:
+			d = self[sourceRow]
+			self.insert(targetRow,d)
+		return True
+	
+	#
+	# Local methods
+	#
 	
 	def fromList(self,l):
 		rowsBefore = len(self._data)
@@ -238,19 +252,40 @@ class TableModel(QtCore.QAbstractTableModel):
 		self._data.insert(position,data)
 		self.endInsertRows()
 		
+		
 
 class TableViewWidget(BaseWidget,QtGui.QWidget):
+	
+	dataChanged = QtCore.Signal()
 
 	def afterCreate(self):
-		self.Layout.addWidget(self.TableContainer,1)
 		if self._field.editForm:
 			subField = self._field.editForm(None)
 			self.Form = subField.create(self)
 			self.Form._field = subField
-			self.Layout.addWidget(self.Form)
 			self.Form.setDisabled(True)
+			
+			pos = self._field.formPosition
+			if pos == FormPosition.Left: 
+				self.Layout.setDirection(QtGui.QBoxLayout.LeftToRight)
+				self.Layout.addWidget(self.Form)
+				self.Layout.addWidget(self.TableContainer,1)
+			elif pos == FormPosition.Right: 
+				self.Layout.setDirection(QtGui.QBoxLayout.LeftToRight)
+				self.Layout.addWidget(self.TableContainer,1)
+				self.Layout.addWidget(self.Form)
+			elif pos == FormPosition.Top:
+				self.Layout.setDirection(QtGui.QBoxLayout.TopToBottom)
+				self.Layout.addWidget(self.Form)
+				self.Layout.addWidget(self.TableContainer,1)
+			elif pos == FormPosition.Bottom:
+				self.Layout.setDirection(QtGui.QBoxLayout.TopToBottom)
+				self.Layout.addWidget(self.TableContainer,1)
+				self.Layout.addWidget(self.Form)
 		else:
 			self.Form = None
+			self.Layout.setDirection(QtGui.QBoxLayout.LeftToRight)
+			self.Layout.addWidget(self.TableContainer,1)
 			
 		toolbar = self.TableContainer.Toolbar
 		field = self._field
@@ -263,7 +298,9 @@ class TableViewWidget(BaseWidget,QtGui.QWidget):
 		toolbar.actionBottom.setVisible(field.tableActions & TableAction.Order)
 		toolbar.setHidden(field.tableActions == TableAction.NoActions)
 
-	class Layout(BaseLayout,QtGui.QHBoxLayout):
+	class Layout(BaseLayout,QtGui.QBoxLayout):
+		
+		args = (QtGui.QBoxLayout.LeftToRight,)
 		
 		def init(self):
 			self.setContentsMargins(0,0,0,0)
@@ -282,7 +319,7 @@ class TableViewWidget(BaseWidget,QtGui.QWidget):
 		class Toolbar(BaseWidget,QtGui.QToolBar):
 			def init(self):
 				self._up.Layout.addWidget(self)
-				
+
 				self.actionInsert = self.addAction(QtGui.QIcon(':/plus-16.png'),'')
 				self.actionDelete = self.addAction(QtGui.QIcon(':/minus-16.png'),'')
 				self.actionUp = self.addAction(QtGui.QIcon(':/up-16.png'),'')
@@ -364,6 +401,8 @@ class TableViewWidget(BaseWidget,QtGui.QWidget):
 			def init(self):
 				self.currentSelection = None
 				self._up.Layout.addWidget(self)
+				self.setDragDropMode(QtGui.QAbstractItemView.InternalMove)
+				
 				
 			def currentChanged(self,current,previous):
 				super(TableViewWidget.TableContainer.Table,self).currentChanged(current,previous)
@@ -411,13 +450,12 @@ class TableViewWidget(BaseWidget,QtGui.QWidget):
 					return
 				model = self.model()
 				form = self._up._up.Form
-				value = form._field.getValue()
-				model[index.row()] = value.__dict__
-
+				value = form._field.getValue()[1]
+				model[index.row()] = value._data
 	
 	
 class _TableView(BaseWidgetField):
-	Name = 'TableView'
+
 	QtClass = TableViewWidget
 	
 	Properties = Properties(
@@ -487,14 +525,21 @@ class _TableView(BaseWidgetField):
 		
 		# Other properties
 		Property(name='columns',required=True,type=list,subType=Column),
+		Property(name='tableActions',default=TableAction.NoActions,
+			flags=[TableAction.Insert,TableAction.Delete,TableAction.Order]
+		),
 		Property(name='editForm',required=True),
-		Property(name='tableActions',default=TableAction.NoActions,flags=[
-			TableAction.Insert,TableAction.Delete,TableAction.Order
-		])
+		Property(name='formPosition',default=FormPosition.Right,
+			options=[FormPosition.Top,FormPosition.Bottom,FormPosition.Left,FormPosition.Right]
+		),
+						
+		# Events
+		EventProperty(name='dataChanged',isDefault=True)
 	)
 	
 	def init(self):
 		self.model = TableModel(self.columns)
+		self.model.dataChanged.connect(lambda *args:self._qt.dataChanged.emit())
 		table = self._qt.Table
 		table.setModel(self.model)
 
@@ -512,7 +557,7 @@ class _TableView(BaseWidgetField):
 	def getValue(self):
 		if self._qt.Table.currentSelection:
 			self._qt.Table.saveForm(self._qt.Table.currentSelection)
-		return self.model._data
+		return None,self.model._data
 	
 	def setValue(self,v):
 		rowsBefore = len(self.model._data)

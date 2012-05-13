@@ -1,11 +1,29 @@
+"""
+TODO:
+
+-- enhancements
+	File: create the QFileDialog ourselves and have a full set of properties for it
+	EventProperty can be marked as 'default' which means it is used if none is specified
+
+-- extra fields, e.g.
+	QDateTimeEdit based field
+	QDateEdit based field
+	QTimeEdit based field
+	RadioButtons: dynamically creates QRadioButtons in a QButtonGroup based on options
+	Color field using QColorDialog
+	? QTreeView based field (perhaps as a property editor)
+	? QColumnView based field
+	? QCalenderWidget based field
+	? Font field using QFontDialog
+	? QLCDNumber based field
+	? Syntax highlighting for TextEdit fields
+	? Add a QWhatsThis button to forms
+"""
+
 from . import base
 from .base import *
+import os
 
-#
-# Concrete fields
-#
-
-		
 class _Form(base._AbstractGroup):
 
 	QtClass = QtGui.QWidget
@@ -55,13 +73,14 @@ class _TabbedForm(_Form):
 			QtGui.QTabWidget.Rounded,QtGui.QTabWidget.Triangular
 		]),
 	)
+	
+	def init(self):
+		self._qt.setIconSize(QtCore.QSize(10,10))
 
 	def layoutChildren(self):
 		for field in self._children.values():
-			icon = field.icon
+			icon = getattr(field,'labelIcon',None)
 			if icon:
-				if not isinstance(field.icon,QtGui.QIcon):
-					icon = QtGui.QIcon(icon)
 				self._qt.addTab(field._qt,icon,field.label)
 			else:
 				self._qt.addTab(field._qt,field.label)
@@ -81,8 +100,17 @@ class _Tab(base._AbstractGroup):
 		Properties.formLayout,
 		Properties.widget,
 		
-		Property(name='icon',type=object)
+		Property(name='icon',type=QtGui.QIcon)
 	)
+
+	def markError(self,error):
+		tabIndex = self._qt.parent().parent().indexOf(self._qt)
+		self._qt.parent().parent().setTabIcon(tabIndex,QtGui.QIcon(':/error-16.png'))
+
+	
+	def clearError(self):
+		tabIndex = self._qt.parent().parent().indexOf(self._qt)
+		self._qt.parent().parent().setTabIcon(tabIndex,QtGui.QIcon())
 
 class Tab(Factory):
 	klass = _Tab
@@ -90,7 +118,7 @@ class Tab(Factory):
 
 
 class _LineEdit(BaseWidgetField):
-	Name = 'LineEdit'
+
 	QtClass = QtGui.QLineEdit
 	
 	Properties = Properties(
@@ -117,18 +145,17 @@ class _LineEdit(BaseWidgetField):
 		Property(name='validator',type=callable),
 	
 		EventProperty(name='textEdited'),
-		EventProperty(name='textChanged'),
+		EventProperty(name='textChanged',isDefault=True),
 	)
 	
 	def init(self):
 		self.initValidator()
 	
-	def getValue(self):
+	def getRawValue(self):
 		error,value = self.qtToValue(self._qt.text())
-		self.setError(error)
 		return value
 		
-	def setValue(self,v):
+	def setRawValue(self,v):
 		if v is NOTSET or v is None:
 			self._qt.clear()
 			return
@@ -145,7 +172,7 @@ class LineEdit(Factory):
 
 	
 class _TextEdit(BaseWidgetField):
-	Name = 'TextEdit'
+
 	QtClass = QtGui.QTextEdit
 	
 	Properties = Properties(
@@ -168,7 +195,7 @@ class _TextEdit(BaseWidgetField):
 			Qt.TextEditorInteraction,Qt.TextBrowserInteraction]
 		),
 		QtProperty(name='undoRedoEnabled',type=bool,getter='isUndoRedoEnabled'),
-		QtProperty(name='wordWrapMode',type=int,options=[QtGui.QTextOption.NoWrap,QtGui.QTextOption.WordWrap,QtGui.QTextOption.ManualWrap,QtGui.QTextOption.WrapAnywhere,
+		QtProperty(name='wordWrapMode',options=[QtGui.QTextOption.NoWrap,QtGui.QTextOption.WordWrap,QtGui.QTextOption.ManualWrap,QtGui.QTextOption.WrapAnywhere,
 			QtGui.QTextOption.WrapAtWordBoundaryOrAnywhere]
 		),
 
@@ -176,16 +203,16 @@ class _TextEdit(BaseWidgetField):
 		Property(name='useHTML',type=bool,default=False),
 		
 		# Events
-		EventProperty(name='textChanged'),
+		EventProperty(name='textChanged',isDefault=True),
 	)
 	
-	def getValue(self):
+	def getRawValue(self):
 		if self.useHTML:
 			return self._qt.toHtml()
 		else:
 			return self._qt.toPlainText()
 		
-	def setValue(self,v):
+	def setRawValue(self,v):
 		if self.useHTML:
 			return self._qt.setHtml(v)
 		else:
@@ -223,7 +250,7 @@ class ComboOptions(Factory):
 
 	
 class _ComboBox(BaseWidgetField):
-	Name = 'ComboBox'
+
 	QtClass = QtGui.QComboBox
 	
 	Properties = Properties(
@@ -256,7 +283,7 @@ class _ComboBox(BaseWidgetField):
 		Property(name='validator',type=callable),
 		
 		# Events
-		EventProperty(name='currentIndexChanged'),
+		EventProperty(name='currentIndexChanged',isDefault=True),
 		EventProperty(name='editTextChanged'),
 	)
 	
@@ -264,7 +291,7 @@ class _ComboBox(BaseWidgetField):
 		self.initValidator()
 	
 	
-	def getValue(self):
+	def getRawValue(self):
 		if self.textAsValue:
 			return self._qt.currentText()
 		else:
@@ -273,7 +300,10 @@ class _ComboBox(BaseWidgetField):
 			return data
 	
 		
-	def setValue(self,v):
+	def setRawValue(self,v):
+		if v is NOTSET:
+			self.clear()
+			return
 		if self.textAsValue:
 			self._qt.lineEdit().setText(v)
 		else:
@@ -283,7 +313,8 @@ class _ComboBox(BaseWidgetField):
 			self._qt.setCurrentIndex(index)
 
 	def clear(self):
-		self._qt.clear()
+		self._qt.setCurrentIndex(0)
+		self._qt.clearEditText()
 
 class ComboBox(Factory):
 	klass = _ComboBox
@@ -309,13 +340,13 @@ Properties.spinBox = Properties(
 		
 
 	# Events
-	EventProperty(name='valueChanged'),
+	EventProperty(name='valueChanged',isDefault=True),
 	EventProperty(name='editingFinished'),
 )
 
 
 class _SpinBox(BaseWidgetField):
-	Name = 'SpinBox'
+
 	QtClass = QtGui.QSpinBox 
 	
 	Properties = Properties(
@@ -327,11 +358,11 @@ class _SpinBox(BaseWidgetField):
 		
 	)
 	
-	def getValue(self):
+	def getRawValue(self):
 		return self._qt.value()
 	
 		
-	def setValue(self,v):
+	def setRawValue(self,v):
 		if v is NOTSET or v is None:
 			self._qt.clear()
 		else:
@@ -346,7 +377,7 @@ class SpinBox(Factory):
 
 
 class _DoubleSpinBox(BaseWidgetField):
-	Name = 'DoubleSpinBox'
+
 	QtClass = QtGui.QDoubleSpinBox 
 	
 	Properties = Properties(
@@ -359,11 +390,11 @@ class _DoubleSpinBox(BaseWidgetField):
 		QtProperty(name='decimals',type=int),
 	)
 	
-	def getValue(self):
+	def getRawValue(self):
 		return self._qt.value()
 	
 		
-	def setValue(self,v):
+	def setRawValue(self,v):
 		if v is NOTSET or v is None:
 			self._qt.clear()
 		else:
@@ -378,7 +409,7 @@ class DoubleSpinBox(Factory):
 
 
 class _Slider(BaseWidgetField):
-	Name = 'Slider'
+
 	QtClass = QtGui.QSlider 
 	
 	Properties = Properties(
@@ -403,20 +434,19 @@ class _Slider(BaseWidgetField):
 			QtGui.QSlider.TicksBelow,QtGui.QSlider.TicksLeft,QtGui.QSlider.TicksRight]
 		),
 		
-		
 		# Events
-		EventProperty(name='valueChanged'),
+		EventProperty(name='valueChanged',isDefault=True),
 		EventProperty(name='rangeChanged'),
 		EventProperty(name='sliderMoved'),
 		EventProperty(name='sliderPressed'),
 		EventProperty(name='sliderReleased'),
 	)
 	
-	def getValue(self):
+	def getRawValue(self):
 		return self._qt.value()
 	
 		
-	def setValue(self,v):
+	def setRawValue(self,v):
 		self._qt.setValue(v)
 
 	def clear(self):
@@ -428,7 +458,7 @@ class Slider(Factory):
 
 
 class _GroupBox(base._AbstractGroup):
-	Name = 'GroupBox'
+
 	QtClass = QtGui.QGroupBox 
 	
 	Properties = Properties(
@@ -448,14 +478,226 @@ class _GroupBox(base._AbstractGroup):
 		
 	)
 
-	def getValue(self):
-		v = super(_GroupBox,self).getValue()
-		if self.checkable:
-			v.setValue('checked',self.checked)
-		return v
-	
-	def clear(self):
-		return
-	
 class GroupBox(Factory):
 	klass = _GroupBox
+
+
+
+class _Label(BaseWidgetField):
+
+	QtClass = QtGui.QLabel
+	
+	Properties = Properties(
+		
+		Properties.core,
+		Properties.widget,
+		QtProperty(name='alignment',type=int,
+			flags=[Qt.AlignAbsolute,Qt.AlignBottom,Qt.AlignCenter,Qt.AlignHCenter,Qt.AlignJustify,Qt.AlignLeading,Qt.AlignLeft,Qt.AlignRight,Qt.AlignTop,Qt.AlignTrailing,Qt.AlignVCenter]
+		),
+		QtProperty(name='scaledContents',type=bool,getter='hasScaledContents'),
+		QtProperty(name='textFormat',options=[Qt.PlainText,Qt.RichText,Qt.AutoText,Qt.LogText]),
+		QtProperty(name='textInteractionFlags',
+			flags=[
+				Qt.NoTextInteraction,Qt.TextSelectableByMouse,Qt.TextSelectableByKeyboard,Qt.LinksAccessibleByMouse,Qt.LinksAccessibleByKeyboard,
+				Qt.TextEditable,Qt.TextEditorInteraction,Qt.TextBrowserInteraction
+			],
+		),
+		QtProperty(name='wordWrap',type=bool),
+		QtProperty(name='text',type=unicode),
+		QtProperty(name='indent',type=int),
+		QtProperty(name='margin',type=int),
+		QtProperty(name='openExternalLinks',type=bool),
+		QtProperty(name='pixmap',type=QtGui.QPixmap),
+		QtProperty(name='picture',type=QtGui.QPicture),
+		QtProperty(name='movie',type=QtGui.QMovie),
+		
+		# Convenience properties
+		QtProperty(name='selectedText',setter=None),
+
+		# Events
+		EventProperty(name='linkActivated'),
+		EventProperty(name='linkHovered'),
+	)
+	
+	def getRawValue(self):
+		return NOTSTORED
+
+		
+	def setRawValue(self,v):
+		if v is NOTSET or v is None:
+			self._qt.clear()
+		else:
+			self._qt.setText(v)
+
+
+	def clear(self):
+		self._qt.clear()
+
+class Label(Factory):
+	klass = _Label
+
+
+
+class _CheckBox(BaseWidgetField):
+
+	QtClass = QtGui.QCheckBox
+	
+	Properties = Properties(
+		
+		Properties.core,
+		Properties.widget,
+		Properties.valueField,
+		
+		# QCheckBox and QAbstractButton properties/settings
+		QtProperty(name='tristate',type=bool,getter='isTristate'),
+		QtProperty(name='text',type=unicode),
+		QtProperty(name='shortcut',type=QtGui.QKeySequence),
+		QtProperty(name='icon',type=QtGui.QIcon),
+		QtProperty(name='iconSize',type=QtCore.QSize),
+		
+		# Events
+		EventProperty(name='stateChanged'),
+	)
+	
+	def getRawValue(self):
+		cs = self._qt.checkState()
+		if cs == Qt.Checked:
+			return True
+		elif cs == Qt.Unchecked:
+			return False
+		elif cs == Qt.PartiallyChecked:
+			return None
+	
+		
+	def setRawValue(self,v):
+		if v is NOTSET:
+			self.clear()
+			
+		if v is True:
+			v = Qt.Checked
+		elif v is False:
+			v = Qt.Unchecked
+		elif v is None:
+			v = Qt.PartiallyChecked
+		else:
+			raise Exception('Invalid value for a checkbox %r (must be True, False or None)'%v)
+		self._qt.setCheckedState(v)
+
+
+	def clear(self):
+		self._qt.setCheckedState(Qt.Unchecked)
+
+class CheckBox(Factory):
+	klass = _CheckBox
+
+
+
+class _Dial(_Slider):
+
+	QtClass = QtGui.QDial
+	
+	Properties = Properties(
+		
+		_Slider.Properties,
+		
+		# QDial properties
+		QtProperty(name='notchSize',type=int),
+		QtProperty(name='notchTarget',type=float),
+		QtProperty(name='notchesVisible',type=bool),
+		QtProperty(name='wrapping',type=bool),
+	)
+	
+class Dial(Factory):
+	klass = _Dial
+
+
+
+class DirectoryField(BaseWidget,QtGui.QWidget):
+	"""
+	Input field + 'Browse...' button pair for selecting existing files/directories
+	"""
+	
+	class Layout(BaseLayout,QtGui.QBoxLayout):
+		args=(QtGui.QBoxLayout.LeftToRight,)
+		def init(self):
+			self._up.setLayout(self)
+			self.setContentsMargins(0,0,0,0)
+			self.addWidget(self._up.Field)
+			self.addWidget(self._up.Button)
+
+	
+	class Field(BaseWidget,QtGui.QLineEdit):
+		pass
+
+
+	class Button(BaseWidget,QtGui.QPushButton):
+		def init(self):
+			self.setText(self.tr('Browse...'))
+			
+		def onclicked(self):
+			field = self._up._field
+			mode = field.mode
+			kargs = dict(parent=self,caption=field.caption or None,dir=field.directory or None,options=field.browserOptions or 0)
+			if mode == FileMode.ExistingDirectory:
+				out = QtGui.QFileDialog.getExistingDirectory(**kargs)
+			elif mode == FileMode.OpenFileName:
+				out,filter = QtGui.QFileDialog.getOpenFileName(**kargs)
+			elif mode == FileMode.OpenFileNames:
+				out,filter = QtGui.QFileDialog.getOpenFileNames(**kargs)
+			elif mode == FileMode.SaveFileName:
+				out,filter = QtGui.QFileDialog.getSaveFileName(**kargs)
+			if out:
+				self._up.Field.setText(out)
+
+
+
+class FileMode(object):
+	ExistingDirectory = 1
+	OpenFileName = 2
+	OpenFileNames = 3
+	SaveFileName = 4
+
+class _File(BaseWidgetField):
+
+	QtClass = DirectoryField
+	
+	Properties = Properties(
+		Properties.core,
+		Properties.widget,
+		Properties.valueField,
+
+		Property(name='caption',type=unicode),
+		Property(name='directory',type=unicode),
+		Property(name='filter',type=unicode),
+		Property(name='selectedFilter',type=unicode),
+		Property(name='browserOptions',type=int,flags=[
+			QtGui.QFileDialog.ShowDirsOnly,QtGui.QFileDialog.DontResolveSymlinks,QtGui.QFileDialog.DontConfirmOverwrite,QtGui.QFileDialog.DontUseNativeDialog,
+			QtGui.QFileDialog.ReadOnly,QtGui.QFileDialog.HideNameFilterDetails,QtGui.QFileDialog.DontUseSheet
+		]),
+		Property(name='mode',options=[FileMode.ExistingDirectory,FileMode.OpenFileName,FileMode.OpenFileNames,FileMode.SaveFileName],default=FileMode.OpenFileName),
+	)
+	
+	def getRawValue(self):
+		return self._qt.Field.text()
+
+	def setRawValue(self,v):
+		return self._qt.Field.setText(v)
+	
+	def defaultValidator(self,v):
+		if not v:
+			return None
+		elif self.mode == FileMode.ExistingDirectory:
+			if not os.path.isdir(v):
+				return 'Must refer to an existing directory'
+		elif self.mode == FileMode.OpenFileName:
+			if not os.path.isfile(v):
+				return 'Must refer to an existing file'
+		elif self.mode == FileMode.SaveFileName:
+			if not os.path.exists(os.path.split(v)[0]):
+				return 'Must be a valid filename in an existing directory'
+		return None
+	
+class File(Factory):
+	klass = _File
+
+		
