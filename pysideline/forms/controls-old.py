@@ -320,31 +320,6 @@ class ComboBox(Factory):
 	klass = _ComboBox
 
 
-Properties.spinBox = Properties(
-	# Spin-box specific properties
-	QtProperty(name='accelerated',type=bool,getter='isAccelerated'),
-	QtProperty(name='alignment',type=int,flags=[
-		Qt.AlignLeft,Qt.AlignRight,Qt.AlignHCenter,Qt.AlignHCenter,Qt.AlignJustify,Qt.AlignTop,Qt.AlignBottom,Qt.AlignVCenter,Qt.AlignCenter,
-		Qt.AlignAbsolute,Qt.AlignLeading,Qt.AlignTrailing]
-	),
-	QtProperty(name='correctionMode',type=int,options=[QtGui.QAbstractSpinBox.CorrectToPreviousValue,QtGui.QAbstractSpinBox.CorrectToNearestValue]),
-	QtProperty(name='keyboardTracking',type=bool),
-	QtProperty(name='specialValueText',type=str),
-	QtProperty(name='wrapping',type=bool),
-	QtProperty(name='suffix',type=str),
-	QtProperty(name='prefix',type=str),
-
-	QtProperty(name='minimum'),
-	QtProperty(name='maximum'),
-	QtProperty(name='singleStep'),
-		
-
-	# Events
-	EventProperty(name='valueChanged',isDefault=True),
-	EventProperty(name='editingFinished'),
-)
-
-
 class _SpinBox(BaseWidgetField):
 
 	QtClass = QtGui.QSpinBox 
@@ -701,3 +676,109 @@ class File(Factory):
 	klass = _File
 
 		
+
+class _DateTimeEdit(BaseWidgetField):
+
+	QtClass = QtGui.QDateTimeEdit
+	
+	Properties = Properties(
+						
+		Properties.core,
+		Properties.widget,
+		Properties.valueField,
+
+		Properties.dateTimeEdit,
+		
+		EventProperty(name='dateChanged'),
+		EventProperty(name='dateTimeChanged',isDefault=True),
+		EventProperty(name='timeChanged'),
+	)
+	
+	def getRawValue(self):
+		return self.getDateTime()
+	
+	def setRawValue(self):
+		return self.dateTime()
+	
+	def valueToRaw(self,v):
+		out = QtCore.QDateTime()
+		out.setDate(v.date())
+		out.setTime(v.time())
+		return out
+
+	def rawToValue(self,v):
+		return v.toPython()
+	
+class DateTimeEdit(Factory):
+	klass = _DateTimeEdit
+
+
+
+class _DateEdit(BaseWidgetField):
+
+	QtClass = QtGui.QDateEdit
+	
+	Properties = Properties(
+						
+		Properties.core,
+		Properties.widget,
+		Properties.valueField,
+
+		Properties.dateTimeEdit,
+		
+		EventProperty(name='dateChanged',isDefault=True),
+	)
+	
+	def getRawValue(self):
+		return self.getDate()
+	
+	def setRawValue(self):
+		return self.date()
+	
+	def valueToRaw(self,v):
+		out = QtCore.QDateTime()
+		out.setDate(v.date())
+		return out.date()
+
+	def rawToValue(self,v):
+		return v.toPython()
+	
+class DateEdit(Factory):
+	klass = _DateEdit
+
+
+
+class _TimeEdit(BaseWidgetField):
+
+	QtClass = QtGui.QDateEdit
+	
+	Properties = Properties(
+						
+		Properties.core,
+		Properties.widget,
+		Properties.valueField,
+
+		Properties.dateTimeEdit,
+		
+		EventProperty(name='timeChanged',isDefault=True),
+	)
+	
+	def getRawValue(self):
+		return self.getTime()
+	
+	def setRawValue(self):
+		return self.time()
+	
+	def valueToRaw(self,v):
+		out = QtCore.QDateTime()
+		out.setDate(v.date())
+		return out.time()
+
+	def rawToValue(self,v):
+		return v.toPython()
+	
+class TimeEdit(Factory):
+	klass = _TimeEdit
+
+
+

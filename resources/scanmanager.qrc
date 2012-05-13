@@ -18,5 +18,6 @@
     	<file>down-16.png</file>
     	<file>top-16.png</file>
     	<file>bottom-16.png</file>
+    	<file>error-16.png</file>
 	</qresource>
 </RCC>

@@ -6,7 +6,6 @@ import types
 import collections
 import inspect
 
-
 class __NOTSET(object):
 	def __nonzero__(self):
 		return False
@@ -493,6 +492,74 @@ Properties.formLayout = Properties(
 )
 
 
+Properties.abstractSpinBox = Properties(
+	# Spin-box specific properties
+	
+	# Abstract spin box
+	QtProperty(name='accelerated',type=bool,getter='isAccelerated'),
+	QtProperty(name='alignment',type=int,flags=[
+		Qt.AlignLeft,Qt.AlignRight,Qt.AlignHCenter,Qt.AlignHCenter,Qt.AlignJustify,Qt.AlignTop,Qt.AlignBottom,Qt.AlignVCenter,Qt.AlignCenter,
+		Qt.AlignAbsolute,Qt.AlignLeading,Qt.AlignTrailing]
+	),
+	QtProperty(name='buttonSymbols',options=[QtGui.QAbstractSpinBox.UpDownArrows,QtGui.QAbstractSpinBox.PlusMinus,QtGui.QAbstractSpinBox.NoButtons]),
+	QtProperty(name='correctionMode',type=int,options=[QtGui.QAbstractSpinBox.CorrectToPreviousValue,QtGui.QAbstractSpinBox.CorrectToNearestValue]),
+	QtProperty(name='frame',type=bool,getter='hasFrame'),
+	QtProperty(name='keyboardTracking',type=bool),
+	QtProperty(name='readOnly',type=bool,getter='isReadOnly'),
+	QtProperty(name='specialValueText',type=str),
+	QtProperty(name='wrapping',type=bool),
+
+)
+
+
+Properties.spinBox = Properties(
+
+	Properties.abstractSpinBox,
+	
+	# Spin box
+	QtProperty(name='suffix',type=str),
+	QtProperty(name='prefix',type=str),
+	QtProperty(name='minimum'),
+	QtProperty(name='maximum'),
+	QtProperty(name='singleStep'),
+		
+	# Abstract spin box events (but not present in other child classes)
+	EventProperty(name='valueChanged',isDefault=True),
+	
+	# Spin box events
+	EventProperty(name='editingFinished'),
+)
+
+
+Properties.dateTimeEdit = Properties(
+
+	Properties.abstractSpinBox,
+
+	QtProperty(name='calendarPopup',type=bool),
+	QtProperty(name='displayFormat',type=str),
+	QtProperty(name='displayedSections',flags=[
+		QtGui.QDateTimeEdit.NoSection,QtGui.QDateTimeEdit.AmPmSection,QtGui.QDateTimeEdit.MSecSection,QtGui.QDateTimeEdit.SecondSection,
+		QtGui.QDateTimeEdit.MinuteSection,QtGui.QDateTimeEdit.HourSection,QtGui.QDateTimeEdit.DaySection,QtGui.QDateTimeEdit.MonthSection,QtGui.QDateTimeEdit.YearSection]
+	),
+	QtProperty(name='minimumDate',type=QtCore.QDate),
+	QtProperty(name='maximumDate',type=QtCore.QDate),
+	QtProperty(name='minimumTime',type=QtCore.QTime),
+	QtProperty(name='maximumTime',type=QtCore.QTime),
+	QtProperty(name='minimumDateTime',type=QtCore.QDateTime),
+	QtProperty(name='maximumDateTime',type=QtCore.QDateTime),
+	QtProperty(name='timeSpec',options=[Qt.LocalTime,Qt.UTC,Qt.OffsetFromUTC]),
+	
+	# Date time edit
+	QtProperty(name='suffix',type=str),
+	QtProperty(name='prefix',type=str),
+	QtProperty(name='minimum'),
+	QtProperty(name='maximum'),
+	QtProperty(name='singleStep'),
+		
+	# Spin box events
+	EventProperty(name='editingFinished'),
+)
+
 
 #
 # Fields
@@ -648,7 +715,7 @@ class BaseWidgetField(BaseField):
 		self._qt.setValidator(validator)
 		
 	
-	def qtToValue(self,v):
+	def rawToValue(self,v):
 		type = getattr(self,'type',None)
 		error = None
 		value = None
@@ -680,11 +747,15 @@ class BaseWidgetField(BaseField):
 			error = 'a value is required'
 
 		return error,value
+
+
+	def valueToRaw(self,v):
+		return v
 	
 	
 	def getValue(self):
 		qtValue = self.getRawValue()
-		error,value = self.qtToValue(qtValue)
+		error,value = self.rawToValue(qtValue)
 		if not error and getattr(self,'validate',None):
 			error = self.validate(value)
 		
@@ -696,7 +767,7 @@ class BaseWidgetField(BaseField):
 
 
 	def setValue(self,v):
-		self.setRawValue(v)
+		self.setRawValue(self.valueToRaw(v))
 
 	
 	def markError(self,error):

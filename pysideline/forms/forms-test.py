@@ -32,6 +32,7 @@ MyForm = TabbedForm(name='main',documentMode=True,contents=[
 		]),
 		File(name='f11',label='File [f11]:',caption='my caption'),#,mode=FileMode.ExistingDirectory),
 		Dial(name='d1',label='Dial [d1]:',default=4,minimum=0,maximum=100,fixedSize=(50,50),singleStep=1,notchesVisible=True),
+		DateTimeEdit(name='dte1',label='DateTimeEdit [dte1]:'),
 	]),
 	Tab(name='tab2',label='Tab 2',contents=[
 		TableView(name='t1',tableActions=TableAction.All,formPosition=FormPosition.Top,

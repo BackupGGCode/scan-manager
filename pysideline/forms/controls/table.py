@@ -1,5 +1,5 @@
-from .base import *
-import base
+from .common import *
+
 import copy
 import cPickle
 
@@ -454,6 +454,7 @@ class TableViewWidget(BaseWidget,QtGui.QWidget):
 				model[index.row()] = value._data
 	
 	
+
 class _TableView(BaseWidgetField):
 
 	QtClass = TableViewWidget
