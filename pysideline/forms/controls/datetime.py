@@ -30,7 +30,7 @@ class _DateTimeEdit(BaseWidgetField):
         return out
 
     def rawToValue(self,v):
-        return v.toPython()
+        return None,v.toPython()
     
 class DateTimeEdit(Factory):
     klass = _DateTimeEdit
@@ -64,7 +64,7 @@ class _DateEdit(BaseWidgetField):
         return out.date()
 
     def rawToValue(self,v):
-        return v.toPython()
+        return None,v.toPython()
     
 class DateEdit(Factory):
     klass = _DateEdit
@@ -98,7 +98,7 @@ class _TimeEdit(BaseWidgetField):
         return out.time()
 
     def rawToValue(self,v):
-        return v.toPython()
+        return None,v.toPython()
     
 class TimeEdit(Factory):
     klass = _TimeEdit

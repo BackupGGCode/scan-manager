@@ -15,7 +15,7 @@ def smGetVersion():
 
 def smGetSettingsVersion():
 	""" Return the current version number for the settings file """
-	return '0.4'
+	return '0.4.8'
 
 
 

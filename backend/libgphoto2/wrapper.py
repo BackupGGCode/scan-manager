@@ -14,18 +14,12 @@ import constants
 import log
 import tempfile
 
-GP_EVENT_UNKNOWN = 0
-GP_EVENT_TIMEOUT = 1
-GP_EVENT_FILE_ADDED = 2    
-GP_EVENT_FOLDER_ADDED = 3 
-GP_EVENT_CAPTURE_COMPLETE = 4       
-
 EVENTTYPE_TO_NAME = {
-	GP_EVENT_UNKNOWN: 'GP_EVENT_UNKNOWN',
-	GP_EVENT_TIMEOUT: 'GP_EVENT_TIMEOUT',
-	GP_EVENT_FILE_ADDED: 'GP_EVENT_FILE_ADDED',    
-	GP_EVENT_FOLDER_ADDED: 'GP_EVENT_FOLDER_ADDED', 
-	GP_EVENT_CAPTURE_COMPLETE: 'GP_EVENT_CAPTURE_COMPLETE',
+	constants.GPEvent.UNKNOWN: 'constants.GPEvent.UNKNOWN',
+	constants.GPEvent.TIMEOUT: 'constants.GPEvent.TIMEOUT',
+	constants.GPEvent.FILE_ADDED: 'constants.GPEvent.FILE_ADDED',    
+	constants.GPEvent.FOLDER_ADDED: 'constants.GPEvent.FOLDER_ADDED', 
+	constants.GPEvent.CAPTURE_COMPLETE: 'constants.GPEvent.CAPTURE_COMPLETE',
 }
 
 
@@ -101,9 +95,10 @@ class Camera(interface.Camera):
 		self.configWidgets = {} 
 		self.capturedData = None
 		self.capturedAuxFiles = []
-		self.hasCaptureEvents = None #: None means attempt to auto-detect
 		
+		self.hasCaptureEvents = None #: None means automatically guess whether capture events are supported
 
+		
 	def getName(self):	
 		return '%s %s'%(self.camera.getModel(),self.camera.getPort())
 	
@@ -116,7 +111,7 @@ class Camera(interface.Camera):
 		self.afterOpened = True
 		self.properties = []
 		self.nameToProperty = {}
-		
+
 		# fetch current camera config
 		self.configurationFromCamera()
 
@@ -132,7 +127,7 @@ class Camera(interface.Camera):
 
 		# now create new CameraProperty instances in self.properties based on the configuration we just retrieved
 		self.createProperties()
-
+		
 
 	def hasViewfinder(self):
 		return True
@@ -183,28 +178,28 @@ class Camera(interface.Camera):
 		
 		while 1:
 			eventType,data = self.camera.waitForEvent(timeout=0)
-			if eventType == GP_EVENT_TIMEOUT:
+			if eventType == constants.GPEvent.TIMEOUT:
 				return
 			if self.hasCaptureEvents is None:
-				if (eventType == GP_EVENT_UNKNOWN and data.startswith('PTP Property')) or eventType == GP_EVENT_FILE_ADDED or eventType == GP_EVENT_CAPTURE_COMPLETE: 
+				if (eventType == constants.GPEvent.UNKNOWN and data.startswith('PTP Property')) or eventType == constants.GPEvent.FILE_ADDED or eventType == constants.GPEvent.CAPTURE_COMPLETE: 
 					### TEMP: if we get any valid event we guess that the camera supports PTP end capture events -- not ideal!  
 					self.hasCaptureEvents = True
-			if not eventType == GP_EVENT_UNKNOWN and data.startswith('PTP Property'):
+			if not eventType == constants.GPEvent.UNKNOWN and data.startswith('PTP Property'):
 				# log everything except timeouts and PTP property change events
 				log.debug('%s %r'%(EVENTTYPE_TO_NAME[eventType],data))  
-			if eventType == GP_EVENT_UNKNOWN and data.startswith('PTP Property'):
+			if eventType == constants.GPEvent.UNKNOWN and data.startswith('PTP Property'):
 				changed = self.configurationFromCamera()
 				if not changed:
 					continue
 				changedProperties = [self.getPropertyByName(widget['name']) for widget in changed]
 				event = interface.PropertiesChangedEvent(self,changedProperties)
 				self.propertiesChanged.emit(event)
-			elif eventType == GP_EVENT_FILE_ADDED:
+			elif eventType == constants.GPEvent.FILE_ADDED:
 				path,fn = data
 				tempFn = os.path.join(tempfile.gettempdir(),tempfile.gettempprefix()+fn)
 				self.camera.downloadFile(path,fn,tempFn)
 				self.capturedAuxFiles.append(tempFn)
-			elif eventType == GP_EVENT_CAPTURE_COMPLETE:
+			elif eventType == constants.GPEvent.CAPTURE_COMPLETE:
 				e = interface.CaptureCompleteEvent(self,data=self.capturedData,auxFiles=self.capturedAuxFiles)
 				self.capturedAuxFiles = []
 				self.captureComplete.emit(e)
@@ -280,7 +275,7 @@ class Camera(interface.Camera):
 		self.nameToProperty = {}	
 		for section in self.config['children']:
 			for widget in section['children']:
-				if widget['type'] == constants.GP_WIDGET_BUTTON:
+				if widget['type'] == constants.GPWidget.BUTTON:
 					property = GPhotoCameraButton(self,widget['name']) 
 				else: 
 					property = GPhotoCameraValueProperty(self,widget['name'])
@@ -318,15 +313,15 @@ class ViewfinderCaptureThread(threading.Thread):
 
 		
 WidgetToControlType = {
-	constants.GP_WIDGET_WINDOW: None,
-	constants.GP_WIDGET_SECTION: None,
-	constants.GP_WIDGET_TEXT: interface.ControlType.LineEdit,
-	constants.GP_WIDGET_RANGE: interface.ControlType.Slider,
-	constants.GP_WIDGET_TOGGLE: interface.ControlType.Checkbox,
-	constants.GP_WIDGET_RADIO: interface.ControlType.Combo,
-	constants.GP_WIDGET_MENU: interface.ControlType.Combo,
-	constants.GP_WIDGET_BUTTON: interface.ControlType.Button,
-	constants.GP_WIDGET_DATE: interface.ControlType.LineEdit, ### TODO: Add a date field
+	constants.GPWidget.WINDOW: None,
+	constants.GPWidget.SECTION: None,
+	constants.GPWidget.TEXT: interface.ControlType.LineEdit,
+	constants.GPWidget.RANGE: interface.ControlType.Slider,
+	constants.GPWidget.TOGGLE: interface.ControlType.Checkbox,
+	constants.GPWidget.RADIO: interface.ControlType.Combo,
+	constants.GPWidget.MENU: interface.ControlType.Combo,
+	constants.GPWidget.BUTTON: interface.ControlType.Button,
+	constants.GPWidget.DATE: interface.ControlType.LineEdit, ### TODO: Add a date field
 }
 
 WidgetNameToControlType = {
@@ -374,7 +369,7 @@ class GPhotoCameraValueProperty(interface.CameraValueProperty):
 			self.camera.configurationFromCamera()
 		
 	def rawToDisplay(self,rawValue):
-		if self.widget['type'] == constants.GP_WIDGET_TOGGLE:
+		if self.widget['type'] == constants.GPWidget.TOGGLE:
 			if rawValue == 0:
 				return None
 			elif rawValue == 1:
@@ -387,7 +382,7 @@ class GPhotoCameraValueProperty(interface.CameraValueProperty):
 			return rawValue
 		
 	def displayToRaw(self,displayValue):
-		if self.widget['type'] == constants.GP_WIDGET_TOGGLE:
+		if self.widget['type'] == constants.GPWidget.TOGGLE:
 			if displayValue is None:
 				return None
 			elif displayValue is False:

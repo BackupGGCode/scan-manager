@@ -27,7 +27,7 @@ class FormData(object):
 	
 	def __init__(self,**kargs):
 		self.__dict__['_data'] = kargs
-		self.__dict__['_errors'] = {}
+		self.__dict__['_errors'] = collections.OrderedDict()
 	
 	
 	def _setValue(self,k,v):
@@ -118,8 +118,8 @@ class _Properties(object):
 	
 	
 	def getDefaultEvent(self):
-		for i in self.contents:
-			if isinstance(i,EventProperty) and getattr(i,'default',None):
+		for i in self.contents.values():
+			if isinstance(i,_EventProperty) and getattr(i,'isDefault',None):
 				return i
 
 
@@ -397,9 +397,11 @@ class Configurable(object):
 			toDo = self.recalculable
 		
 		for property in toDo:
+			if property.name not in self.kargs:
+				raise ConfigurationError('Trying to recalculate property %s.%s but property has not been set'%(getattr(self,'name',repr(self)),property.name))
 			property.set(self.kargs[property.name])
-			if isinstance(property,_QtProperty):
-				property.toQt(self._qt)
+			#if isinstance(property,_QtProperty):
+			#	property.toQt(self._qt)
 			
 	
 	def __getattr__(self,k):
@@ -416,6 +418,10 @@ class Configurable(object):
 				self._properties[k].set(v)
 				return
 		self.__dict__[k] = v
+		
+		
+	def __repr__(self):
+		return '<%s %s>'%(self.__class__.__name__[1:],self.name)
 
 #
 # Common properties
@@ -425,9 +431,19 @@ Properties.core = Properties(
 	# Core properies
 	Property(name='name',type=str,required=True),
 	Property(name='label',type=str),
-	Property(name='depends',type=list,subType=str),
+	Property(name='depends'),
 	Property(name='klass',type=type),
 	Property(name='labelIcon',type=QtGui.QIcon),
+
+	# Layout-related properties
+	Property(name='row',type=int),
+	Property(name='col',type=int),
+	Property(name='rowSpan',type=int),
+	Property(name='colSpan',type=int),
+	Property(name='cellAlignment',type=int,flags=[
+		Qt.AlignLeft,Qt.AlignRight,Qt.AlignHCenter,Qt.AlignHCenter,Qt.AlignJustify,Qt.AlignTop,Qt.AlignBottom,Qt.AlignVCenter,Qt.AlignCenter,
+		Qt.AlignAbsolute,Qt.AlignLeading,Qt.AlignTrailing]
+	),
 )
 	
 Properties.widget = Properties(
@@ -591,24 +607,21 @@ class BaseField(Configurable):
 			
 		for item in depends:
 			if '=' in item:
-				# "myProperty=myOtherField.someEvent"
+				# "myProperty=myOtherField.someEvent" or "myProperty=myOtherField" 
 				propertyName = item.split('=')[0]
-				rest = item.split('=')[1]
-				fieldName,eventName = rest.split('.')
+				item = item.split('=')[1]
+			else:
+				# "myOtherField.someEvent" or "myOtherField"
+				propertyName = None
+			if '.' in item:
+				fieldName,eventName = item.split('.')
 				field = self.form.getField(fieldName)
 				event = field._properties[eventName]
 			else:
-				# "myOtherField.someEvent"
-				propertyName = None
-				if '.' in item:
-					fieldName,eventName = item.split('.')
-					field = self.form.getField(fieldName)
-					event = field._properties[eventName]
-				else:
-					field = self.form.getField(item)
-					event = field._properties.getDefaultEvent()
-					if event is None:
-						raise self._properties['depends'].configurationError('dependency %r -- field %s has no default event'%(item,field.name))
+				field = self.form.getField(item)
+				event = field._properties.getDefaultEvent()
+				if event is None:
+					raise self._properties['depends'].configurationError('dependency %r -- field %s (%s) has no default event'%(item,field.name,field.__class__.__name__[1:]))
 				
 			event.notify(self.name,propertyName)
 			
@@ -754,15 +767,24 @@ class BaseWidgetField(BaseField):
 	
 	
 	def getValue(self):
+		error,value = self.getValueAndError(mark=False)
+		if error:
+			return NOTSET
+		else:
+			return value
+	
+	
+	def getValueAndError(self,mark=True):
 		qtValue = self.getRawValue()
 		error,value = self.rawToValue(qtValue)
 		if not error and getattr(self,'validate',None):
 			error = self.validate(value)
 		
-		if error:
-			self.markError(error)
-		else:
-			self.clearError()
+		if mark:
+			if error:
+				self.markError(error)
+			else:
+				self.clearError()
 		return error,value
 
 
@@ -773,19 +795,21 @@ class BaseWidgetField(BaseField):
 	def markError(self,error):
 		if getattr(self,'_label',None):
 			self._label.setStyleSheet('.%s { color: red; }'%self._label.__class__.__name__)
-		self._qt.setStyleSheet('.%s { background: #FF9999; }'%self._qt.__class__.__name__)
+		#self._qt.setStyleSheet('.%s { background: #FF9999; }'%self._qt.__class__.__name__)
 
 	
 	def clearError(self):
 		if getattr(self,'_label',None):
 			self._label.setStyleSheet('')
-		self._qt.setStyleSheet('')
+		#self._qt.setStyleSheet('')
 		
 	
 	def _set_hidden(self,v):
 		self._qt.setHidden(v)
 		if getattr(self,'_label',None):
 			self._label.setHidden(v)
+		self.form._qt.adjustSize()
+		self.form._qt.parent().adjustSize()
 			
 			
 	def _get_hidden(self):
@@ -886,13 +910,15 @@ class _AbstractGroup(BaseWidgetField):
 				field._label = None 
 
 		
-	def getValue(self):
+	def getValueAndError(self,mark=True):
 		
 		data = FormData()
 		hasErrors = False
 		
 		for field in self._children.values():
-			error,value = field.getValue()
+			if field.hidden:
+				continue
+			error,value = field.getValueAndError(mark=mark)
 			if value is NOTSTORED:
 				continue
 			if isinstance(value,FormData) and not field.groupData:
@@ -906,10 +932,11 @@ class _AbstractGroup(BaseWidgetField):
 		if data._errors:
 			hasErrors = True
 		
-		if hasErrors:
-			self.markError(None)
-		else:
-			self.clearError()
+		if mark:
+			if hasErrors:
+				self.markError(None)
+			else:
+				self.clearError()
 		
 		return hasErrors,data
 
@@ -952,7 +979,7 @@ class _AbstractGroupGrid(_AbstractGroup):
 				field._label.setText(field.label)
 				field._label.setBuddy(field._qt)
 				self._qt.Layout.addWidget(field._label,row,0)
-				self._qt.Layout.addWidget(field._qt,row,1,field.rowSpan,(2*field.colSpan)-1)
+				self._qt.Layout.addWidget(field._qt,row,1,getattr(field,'rowSpan',1),(2*getattr(field,'colSpan',1))-1)
 			else:
-				self._qt.Layout.addWidget(field._qt,row,0,field.rowSpan,(2*field.colSpan))
+				self._qt.Layout.addWidget(field._qt,row,0,getattr(field,'rowSpan',1),(2*getattr(field,'colSpan',1)))
 				field._label = None

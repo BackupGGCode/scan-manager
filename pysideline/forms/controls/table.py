@@ -34,7 +34,7 @@ class ColumnDelegate(QtGui.QItemDelegate):
 		v = index.model().data(index)
 		return editor._field.setValue(v)
 	def setModelData(self,editor,model,index):
-		model.setData(index,editor._field.getValue()[1])
+		model.setData(index,editor._field.getValue())
 		
 		
 
@@ -450,7 +450,7 @@ class TableViewWidget(BaseWidget,QtGui.QWidget):
 					return
 				model = self.model()
 				form = self._up._up.Form
-				value = form._field.getValue()[1]
+				value = form._field.getValue()
 				model[index.row()] = value._data
 	
 	
@@ -555,7 +555,7 @@ class _TableView(BaseWidgetField):
 				table.horizontalHeader().setSectionHidden(index,column.hidden)
 		
 		
-	def getValue(self):
+	def getValueAndError(self,mark=False):
 		if self._qt.Table.currentSelection:
 			self._qt.Table.saveForm(self._qt.Table.currentSelection)
 		return None,self.model._data

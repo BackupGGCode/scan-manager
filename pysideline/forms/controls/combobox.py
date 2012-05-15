@@ -11,10 +11,10 @@ class _ComboOptions(base._QtProperty):
 			elif len(item) == 1:
 				q.addItem(item[0])
 			elif len(item) == 2:
-				q.addItem(item[1],item[0])
+				q.addItem(item[0],item[1])
 			elif len(item) == 3:
 				icon = QtGui.QIcon(item[3])
-				q.addItem(icon,item[1],item[0])
+				q.addItem(icon,item[0],item[1])
 			else:
 				raise self._properties['options'].configurationError('invalid item at index %d'%ndx)
 
@@ -75,12 +75,15 @@ class _ComboBox(BaseWidgetField):
 	
 		
 	def setRawValue(self,v):
-		if v is NOTSET:
-			self.clear()
-			return
 		if self.textAsValue:
-			self._qt.lineEdit().setText(v)
+			if v is NOTSET or v is None:
+				self._qt.lineEdit().clear()
+			else:
+				self._qt.lineEdit().setText(v)
 		else:
+			if v is NOTSET or v is None:
+				self._qt.setCurrentIndex(0)
+				return
 			index = self._qt.findData(v)
 			if index == -1:
 				raise KeyError(v)

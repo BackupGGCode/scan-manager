@@ -17,10 +17,10 @@ MyForm = TabbedForm(name='main',documentMode=True,contents=[
 		CheckBox(name='f2_5',label='Field 2_5 (check) [f2_5]:',default=None),
 		ComboBox(name='f3',label='Combo [f3]:',default=2,type=int,options=[(1,'test 1'),(2,'test 2'),(3,'test 3')]),
 		ComboBox(name='f4',label='Combo [f4]:',default=2,type=str,depends=['options=f3.currentIndexChanged'],
-				 options=lambda f:[('%d'%(f.f3.getValue()[1] or 0),'test %d.%d'%((f.f3.getValue()[1] or 0),i)) for i in [5,6,7,8,9]]
+				 options=lambda f:[('%d'%(f.f3.getValue() or 0),'test %d.%d'%((f.f3.getValue() or 0),i)) for i in [5,6,7,8,9]]
 		),
 		DoubleSpinBox(name='f4.1',label='Field 4.1 [f4.1]:',default=14.1,minimum=10.0,maximum=20.0,singleStep=0.1,decimals=2,prefix='x=',suffix='s'),
-		SpinBox(name='f5',label='Field 5 [f5]:',default=4,minimum=0,maximum=100,singleStep=2,prefix='v=',suffix='%',hidden=lambda f:f.f1.getValue()[1] > '',depends=['hidden=f1.textEdited']),
+		SpinBox(name='f5',label='Field 5 [f5]:',default=4,minimum=0,maximum=100,singleStep=2,prefix='v=',suffix='%',hidden=lambda f:f.f1.getValue() > '',depends=['hidden=f1.textEdited']),
 		Slider(name='f6',label='Field 6 [f6]:',default=4,minimum=0,maximum=100,tickInterval=10,singleStep=5,tickPosition=QtGui.QSlider.TicksBelow,orientation=Qt.Horizontal),
 		GroupBox(name='g1',title='Group 1',groupData=True,contents=[
 			LineEdit(name='f7',label='Field g1.1 [f7]:',default='default_value'),
@@ -70,6 +70,7 @@ class App(Application):
 		def init(self):
 			self.setWindowTitle(self.tr('pysideline.forms test application'))
 			self.setCentralWidget(self.MainWidget)
+			print 'stylesheet: %r'%self.style()
 			self.show()
 
 		class MainWidget(BaseWidget,QtGui.QWidget):
@@ -97,7 +98,7 @@ class App(Application):
 					self._up.Layout.addWidget(self)
 					self.setText('OK')
 				def onclicked(self):
-					errors,value = self.app.myForm.getValue()
+					errors,value = self.app.myForm.getValueAndError()
 					print value._pp()
 				
 app = App(sys.argv)

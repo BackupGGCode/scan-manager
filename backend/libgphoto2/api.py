@@ -98,10 +98,10 @@ class API(object):
 	def getVersion(self,verbose=True):
 		self.gp.gp_library_version.restype = ctypes.POINTER(ctypes.c_char_p)
 		if not verbose:
-			arrText = self.gp.gp_library_version(GP_VERSION_SHORT)
+			arrText = self.gp.gp_library_version(GPVersion.SHORT)
 			return arrText[0]
 		else:
-			arrText = self.gp.gp_library_version(GP_VERSION_VERBOSE)
+			arrText = self.gp.gp_library_version(GPVersion.VERBOSE)
 			out = []
 			for s in arrText:
 				if s is None:
@@ -166,21 +166,21 @@ class API(object):
 
 
 	def log(self,text):
-		print 'libgphoto API WARNING:',text
+		print('libgphoto API WARNING:',text)
 
 
 	def traceDLLCallStart(self,function,args,kargs):
 		sArgs = ['%r'%i for i in args]
 		sArgs += ['%s=%r'%(k,v) for k,v in kargs.items()]
 		s = '%s(%s)'%(function.__name__,','.join(sArgs))
-		print s
+		print(s)
 		
 		
 	def traceDLLCallEnd(self,function,args,kargs,result):
 		sArgs = ['%r'%i for i in args]
 		sArgs += ['%s=%r'%(k,v) for k,v in kargs.items()]
 		s = '%s(%s) -> %r'%(function.__name__,','.join(sArgs),result)
-		print s
+		print(s)
 		
 		
 
@@ -539,11 +539,11 @@ class Camera(object):
 				changed = 0,
 				children = [],
 			)
-			if type in (GP_WIDGET_MENU,GP_WIDGET_RADIO):
+			if type in (GPWidget.MENU,GPWidget.RADIO):
 				out['choices'] = widget.getChoices()
-			elif type == GP_WIDGET_RANGE:
+			elif type == GPWidget.RANGE:
 				out['range'] = widget.getRange()
-			elif type in (GP_WIDGET_WINDOW,GP_WIDGET_SECTION):
+			elif type in (GPWidget.WINDOW,GPWidget.SECTION):
 				for child in widget.getChildren():
 					out['children'].append(widgetToDict(child))
 			return out
@@ -568,7 +568,7 @@ class Camera(object):
 					
 
 	def getAbilities(self):
-		ab = CameraAbilities()
+		ab = CameraAbilities(self.api)
 		self.api.checkedGP.gp_camera_get_abilities(self.c, PTR(ab.c))
 		self.api.register(ab)
 		return ab
@@ -586,14 +586,24 @@ class Camera(object):
 		eventType = ctypes.c_int()
 		data = ctypes.c_char_p()
 		self.api.checkedGP.gp_camera_wait_for_event(self.c,timeout,PTR(eventType),PTR(data),self.api.context)
-		if eventType.value == GP_EVENT_TIMEOUT:
+		if eventType.value == GPEvent.TIMEOUT:
 			return eventType.value,None
-		elif eventType.value == GP_EVENT_FILE_ADDED:
+		elif eventType.value == GPEvent.FILE_ADDED:
 			path = ctypes.cast(data,POINTER(structures.CameraFilePath))
 			return eventType.value,(path.contents.folder,path.contents.name)
 		else:
 			return eventType.value,data.value
-
+		
+	def getStorageInfo(self):
+		numInfos = ctypes.c_int()
+		infos = ctypes.c_void_p()
+		self.api.checkedGP.gp_camera_get_storageinfo(self.c,PTR(infos),PTR(numInfos),self.api.context)
+		if not numInfos.value:
+			return None
+		raise Exception('NOT IMPLEMENTED YET')
+		rc = POINTER(structures.CameraStorageInformation * numInfos.value)(infos.value)
+		
+		
 
 class CameraFile(object):
 	def __init__(self,api,cam=None,srcfolder=None,srcfilename=None):
@@ -729,26 +739,26 @@ class CameraWidget(object):
 	label = property(getLabel,setLabel)
 
 	def getValue(self):
-		if self.type in (GP_WIDGET_WINDOW,GP_WIDGET_SECTION):
+		if self.type in (GPWidget.WINDOW,GPWidget.SECTION):
 			return None
 		value = ctypes.c_void_p()
 		rc = self.api.checkedGP.gp_widget_get_value(self.c, PTR(value))
-		if self.type in (GP_WIDGET_MENU, GP_WIDGET_RADIO, GP_WIDGET_TEXT):
+		if self.type in (GPWidget.MENU, GPWidget.RADIO, GPWidget.TEXT):
 			value = ctypes.cast(value, ctypes.c_char_p)
 			value = value.value
-		elif self.type == GP_WIDGET_RANGE:
+		elif self.type == GPWidget.RANGE:
 			if value.value is None:
 				value = None
 			else:
 				value = ctypes.cast(ctypes.pointer(value), ctypes.POINTER(ctypes.c_float))
 				value = value.contents.value
-		elif self.type in (GP_WIDGET_TOGGLE,GP_WIDGET_DATE):
+		elif self.type in (GPWidget.TOGGLE,GPWidget.DATE):
 			if value.value is None:
 				value = 0
 			else:
 				value = value.value
-		elif self.type == GP_WIDGET_BUTTON:
-			raise Exception('Getting a value for a GP_WIDGET_BUTTON should return a CameraWidgetCallback but we haven\'t built that yet')
+		elif self.type == GPWidget.BUTTON:
+			raise Exception('Getting a value for a GPWidget.BUTTON should return a CameraWidgetCallback but we haven\'t built that yet')
 		else:
 			raise Exception('Unknown widget type %r'%self.type)
 		self.api.check(rc)
@@ -756,15 +766,15 @@ class CameraWidget(object):
 	def setValue(self, value):
 		if value is None:
 			return
-		if self.type in (GP_WIDGET_WINDOW,GP_WIDGET_SECTION):
+		if self.type in (GPWidget.WINDOW,GPWidget.SECTION):
 			return None
-		elif self.type in (GP_WIDGET_MENU, GP_WIDGET_RADIO, GP_WIDGET_TEXT):
+		elif self.type in (GPWidget.MENU, GPWidget.RADIO, GPWidget.TEXT):
 			v = ctypes.c_char_p(value)
-		elif self.type == GP_WIDGET_RANGE:
+		elif self.type == GPWidget.RANGE:
 			v = PTR(ctypes.c_float(float(value)))
-		elif self.type in (GP_WIDGET_TOGGLE,GP_WIDGET_DATE):
+		elif self.type in (GPWidget.TOGGLE,GPWidget.DATE):
 			v = PTR(ctypes.c_int(int(value)))
-		elif self.type == GP_WIDGET_BUTTON:
+		elif self.type == GPWidget.BUTTON:
 			v = structures.CameraWidgetCallback(
 				lambda cameraAddress,widgetAddress,context: 
 					value( self.api.getByAddress(cameraAddress), self.api.getByAddress(widgetAddress) )
@@ -887,7 +897,7 @@ class CameraWidgetSimple(object):
 	pass
 class CameraWindow(CameraWidget):
 	def __init__(self,api,camera):
-		super(CameraWindow,self).__init__(api=api,type=GP_WIDGET_WINDOW)
+		super(CameraWindow,self).__init__(api=api,type=GPWidget.WINDOW)
 		self.camera = camera
 		
 	def writeToCamera(self):

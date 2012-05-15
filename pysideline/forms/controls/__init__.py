@@ -23,6 +23,7 @@ from .common import *
 from .datetime import *
 from .file import *
 from .form import *
+from .gridlayout import *
 from .groupbox import *
 from .label import *
 from .lineedit import *

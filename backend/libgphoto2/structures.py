@@ -5,13 +5,6 @@ from ctypes import *
 
 CameraWidgetCallback = CFUNCTYPE(c_void_p, c_void_p, c_void_p)
 
-GP_EVENT_UNKNOWN = 0
-GP_EVENT_TIMEOUT = 1
-GP_EVENT_FILE_ADDED = 2    
-GP_EVENT_FOLDER_ADDED = 3 
-GP_EVENT_CAPTURE_COMPLETE = 4       
-
-
 class CameraFilePath(Structure):
 	_fields_ = [('name', (c_char * 128)),
 				('folder', (c_char * 1024))]
@@ -67,6 +60,19 @@ class CameraWidget(Structure):
 				('ref_count', (c_int)),
 				('id', (c_int)),
 				('callback', (c_void_p))]
+
+
+class CameraStorageInformation (Structure):
+	_fields_ = [('fields', c_int),
+				('basedir', (c_char * 256)),
+				('label', (c_char * 256)),
+				('description', (c_char * 256)),
+				('type', (c_int)),
+				('fstype', (c_int)),
+				('access', (c_int)),
+				('capacitykbytes', (c_ulong)),
+				('freekbytes', (c_ulong)),
+				('freeimages', (c_ulong))]
 
 
 class PortInfo(Structure):

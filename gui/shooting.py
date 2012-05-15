@@ -146,13 +146,13 @@ class MainWindow(BaseWidget,QtGui.QMainWindow):
 		
 		# override default thumbnail sizes using user-selected sizes
 		if 'thumbnailSize' in self.app.setup:
-			self.app.Thumbnails.thumbnailWidth = self.app.setup.thumbnailSize[0]
-			self.app.Thumbnails.thumbnailHeight = self.app.setup.thumbnailSize[1]
+			self.app.Thumbnails.thumbnailWidth = self.app.setup.thumbnailSize.width
+			self.app.Thumbnails.thumbnailHeight = self.app.setup.thumbnailSize.height
 
 		if solo:
-			self.app.ThumbnailDock.setMinimumWidth((self.app.setup.thumbnailSize[0]*1)+37)
+			self.app.ThumbnailDock.setMinimumWidth((self.app.setup.thumbnailSize.width*1)+37)
 		else:
-			self.app.ThumbnailDock.setMinimumWidth((self.app.setup.thumbnailSize[0]*2)+37)
+			self.app.ThumbnailDock.setMinimumWidth((self.app.setup.thumbnailSize.width*2)+37)
 			
 		# set up the image manager to manage captured images and control the thumbnail view 
 		self.app.imageManager = CapturedImageManager(path=self.app.setup.outputDirectory,view=self.app.Thumbnails,solo=solo)
