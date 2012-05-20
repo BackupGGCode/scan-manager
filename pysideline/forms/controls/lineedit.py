@@ -39,7 +39,7 @@ class _LineEdit(BaseWidgetField):
 		return value
 		
 	def setRawValue(self,v):
-		if v is NOTSET or v is None:
+		if v == NOTSET or v is None:
 			self._qt.clear()
 			return
 		if type(v) in (int,float):

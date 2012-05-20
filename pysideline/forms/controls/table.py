@@ -211,11 +211,9 @@ class TableModel(QtCore.QAbstractTableModel):
 	#
 	
 	def fromList(self,l):
-		rowsBefore = len(self._data)
-		self._data = l
-		tl = self.index(0,0)
-		br = self.index(max(rowsBefore-1,len(self._data)-1),len(self._columns)-1)
-		self.dataChanged.emit(tl,br)
+		self.removeRows(0,self.rowCount())
+		for i in l:
+			self.append(i)
 
 	def toList(self):
 		#out = [i._toDict() for i in self._data]
@@ -260,7 +258,7 @@ class TableViewWidget(BaseWidget,QtGui.QWidget):
 
 	def afterCreate(self):
 		if self._field.editForm:
-			subField = self._field.editForm(None)
+			subField = self._field.editForm(self._field)
 			self.Form = subField.create(self)
 			self.Form._field = subField
 			self.Form.setDisabled(True)
@@ -451,6 +449,8 @@ class TableViewWidget(BaseWidget,QtGui.QWidget):
 				model = self.model()
 				form = self._up._up.Form
 				value = form._field.getValue()
+				if value == NOTSET:
+					return
 				model[index.row()] = value._data
 	
 	
@@ -546,12 +546,11 @@ class _TableView(BaseWidgetField):
 
 		for index,column in enumerate(self.columns):
 			delegate = column.createDelegate(self._qt)
-			if not delegate:
-				continue
-			table.setItemDelegateForColumn(index,delegate)
-			if column.resizeMode is not NOTSET:
+			if delegate:
+				table.setItemDelegateForColumn(index,delegate)
+			if column.resizeMode != NOTSET:
 				table.horizontalHeader().setResizeMode(index,column.resizeMode)
-			if column.hidden is not NOTSET:
+			if column.hidden != NOTSET:
 				table.horizontalHeader().setSectionHidden(index,column.hidden)
 		
 		
@@ -562,7 +561,7 @@ class _TableView(BaseWidgetField):
 	
 	def setValue(self,v):
 		rowsBefore = len(self.model._data)
-		self.model._data.fromList(v)
+		self.model.fromList(v)
 		
 	def clear(self):
 		self.setValue([])

@@ -19,6 +19,7 @@ import threading
 import log
 import tempfile
 import time
+from contextlib import contextmanager
 
 from PySide import QtGui
 
@@ -103,7 +104,6 @@ class Camera(interface.Camera):
 		self.deviceInfo = self.ptpSession.GetDeviceInfo()
 		
 		self.vendorId = self.deviceInfo.VendorExtensionID
-		self.version = self.ptpSession.GetVersion()
 		
 
 
@@ -116,6 +116,8 @@ class Camera(interface.Camera):
 			return
 		
 		self.opened = True
+		
+		self.version = self.ptpSession.GetVersion()
 		
 		self.execute('switch_mode_usb(1)')
 		
@@ -148,10 +150,11 @@ class Camera(interface.Camera):
 		except: 
 			pass
 		
-		try:
-			self.execute('switch_mode_usb(0)')
-		except:
-			pass
+		### TODO: TEMP: uncomment this!
+		#try:
+		#	self.execute('switch_mode_usb(0)')
+		#except:
+		#	pass
 
 	
 	def ontimer(self):
@@ -173,77 +176,93 @@ class Camera(interface.Camera):
 	def stopViewfinder(self):
 		if self.viewfinderThread:
 			self.viewfinderThread.stopped = True
+			self.viewfinderThread.join()
 
 
 	def isViewfinderStarted(self):
 		if self.viewfinderThread and not self.viewfinderThread.stopped:
 			return True
 		else:
-			return False 
-
+			return False
+	
 	#
 	# Non-interface
 	#
 	
+	@contextmanager
+	def viewfinderDisabled(self):
+		viewfinderStarted = self.isViewfinderStarted()
+		if viewfinderStarted:
+			self.stopViewfinder()
+		try:
+			yield
+		finally:
+			if viewfinderStarted:
+				self.startViewfinder()
+	
 
-	def execute(self,script,expectMessages=False,blind=False,*args):
+	def execute(self,script,expectMessages=False,blind=False,messageCallback=None,*args):
+
+		with self.viewfinderDisabled():
 		
-		scriptId,rc = self.ptpSession.ExecuteScript(script)
-		
-		if blind:
-			return scriptId
-		
-		rc = self.ptpSession.GetScriptStatus(scriptId=scriptId)
-		if rc == ScriptStatusFlag.RUN:
-			for arg in args:
-				rc = self.ptpSession.WriteScriptMessage(scriptId=scriptId,message=arg)
-				if rc == ScriptMessageStatus.OK:
-					continue
-				elif rc == ScriptMessageStatus.NOTRUN:
-					raise CHDKError('Trying to write a CHDK message to a LUA script but the script has stopped')
-				elif rc == ScriptMessageStatus.QFULL:
-					raise CHDKError('Message queue full while trying to write a CHDK PTP message to a LUA script')
-				elif rc == ScriptMessageStatus.BADID:
-					raise CHDKError('Trying to write a CHDK message to a LUA script but the script ID is invalid')
-				else:
-					raise CHDKError('Unknown return value %r'%rc)
-		
-		messages = []
-		toReturn = None
-		
-		while 1:
+			scriptId,rc = self.ptpSession.ExecuteScript(script)
+			
+			if blind:
+				return scriptId
+			
 			rc = self.ptpSession.GetScriptStatus(scriptId=scriptId)
-			if rc == ScriptStatusFlag.DONE:
-				return None
-			elif rc == ScriptStatusFlag.RUN:
-				time.sleep(0.01)
-				continue
-			elif rc == ScriptStatusFlag.MSG:
-				msg = self.ptpSession.ReadScriptMessage(scriptId=scriptId)
-				if msg.type == ScriptMessageType.NONE:
-					# no message
-					continue
-				elif msg.type == ScriptMessageType.ERR:
-					if msg.subType == ScriptErrorMessageType.COMPILE:
-						raise LUACompileError(msg.value)
-					elif msg.subType == ScriptErrorMessageType.RUN: 
-						raise LUARuntimeError(msg.value)
+			if rc == ScriptStatusFlag.RUN:
+				for arg in args:
+					rc = self.ptpSession.WriteScriptMessage(scriptId=scriptId,message=arg)
+					if rc == ScriptMessageStatus.OK:
+						continue
+					elif rc == ScriptMessageStatus.NOTRUN:
+						raise CHDKError('Trying to write a CHDK message to a LUA script but the script has stopped')
+					elif rc == ScriptMessageStatus.QFULL:
+						raise CHDKError('Message queue full while trying to write a CHDK PTP message to a LUA script')
+					elif rc == ScriptMessageStatus.BADID:
+						raise CHDKError('Trying to write a CHDK message to a LUA script but the script ID is invalid')
 					else:
-						raise LUAError(msg.value)
-				elif msg.type == ScriptMessageType.USER:
-					if not expectMessages:
-						raise CHDKError('Unexpected message %r sent by Lua script'%msg)
-					messages.append(msg.value)
-				elif msg.type == ScriptMessageType.RET:
-					toReturn = msg.value
-				else:
-					raise CHDKError('Unknown message type %r'%msg.type)
-		
-		if expectMessages:
-			return toReturn,messages
-		else:
-			return toReturn
-		
+						raise CHDKError('Unknown return value %r'%rc)
+			
+			messages = []
+			toReturn = None
+			
+			while 1:
+				rc = self.ptpSession.GetScriptStatus(scriptId=scriptId)
+				if rc == ScriptStatusFlag.DONE:
+					break
+				elif rc == ScriptStatusFlag.RUN:
+					time.sleep(0.01)
+					continue
+				elif rc == ScriptStatusFlag.MSG:
+					msg = self.ptpSession.ReadScriptMessage(scriptId=scriptId)
+					if msg.type == ScriptMessageType.NONE:
+						# no message
+						continue
+					if messageCallback:
+						messageCallback(msg)
+					if msg.type == ScriptMessageType.ERR:
+						if msg.subType == ScriptErrorMessageType.COMPILE:
+							raise LUACompileError(msg.value)
+						elif msg.subType == ScriptErrorMessageType.RUN: 
+							raise LUARuntimeError(msg.value)
+						else:
+							raise LUAError(msg.value)
+					elif msg.type == ScriptMessageType.USER:
+						if not expectMessages:
+							raise CHDKError('Unexpected message %r sent by Lua script'%msg)
+						messages.append(msg.value)
+					elif msg.type == ScriptMessageType.RET:
+						toReturn = msg.value
+					else:
+						raise CHDKError('Unknown message type %r'%msg.type)
+			
+			if expectMessages:
+				return toReturn,messages
+			else:
+				return toReturn
+			
 	
 	def createProperties(self):
 		self.properties = []
@@ -317,7 +336,7 @@ class CHDKCameraValueProperty(interface.CameraValueProperty):
 		return self.camera.execute(self.config.getValue)
 	
 	def setRawValue(self,v):
-		self.camera.execute(self.config.setValue,v)
+		self.camera.execute(self.config.setValue,str(v))
 		
 	def rawToDisplay(self,rawValue):
 		return rawValue
@@ -326,13 +345,13 @@ class CHDKCameraValueProperty(interface.CameraValueProperty):
 		return displayValue
 		
 	def getMin(self):
-		return self.range[0]
+		return self.range['min']
 	
 	def getMax(self):
-		return self.range[1]
+		return self.range['max']
 	
 	def getStep(self):
-		return self.range[2]
+		return self.range['step'] or 1
 	
 	def getPossibleValues(self):
 		return self.options
@@ -352,42 +371,14 @@ class CHDKCameraValueProperty(interface.CameraValueProperty):
 	
 	def setup(self):
 		ct = self.getControlType()
+		if ct != interface.ControlType.Static:
+			self.readOnly = self.camera.execute(self.config.readOnly)
 		if ct == interface.ControlType.Combo:
-			self.options = self.camera.execute(self.config.getRange)
+			self.options = self.camera.execute(self.config.options)
 		elif ct == interface.ControlType.Slider:
 			self.range = self.camera.execute(self.config.getRange)
 		else:
 			return
 	
 
-
-class StartViewfinder(CHDKCameraValueProperty):
-	propertyId = '_START_VIEWFINDER'
-	name = 'Start viewfinder'
-	section = 'Camera Actions'
-	controlType = interface.ControlType.Button
-	def getName(self):
-		return self.name
-	def getId(self):
-		return self.propertyId
-	def getControlType(self):
-		return interface.ControlType.Button
-	def isReadOnly(self):
-		return not self.camera.hasViewfinder()
-	def go(self):
-		self.camera.startViewfinder()
-	def getSection(self):
-		return self.section
-
-
-		
-class StopViewfinder(StartViewfinder):
-	propertyId = '_STOP_VIEWFINDER'
-	name = 'Stop viewfinder'
-	section = 'Camera Actions'
-	def go(self):
-		self.camera.stopViewfinder()
-
-		
-
-API.propertyClasses = [StartViewfinder,StopViewfinder]
+API.propertyClasses = []

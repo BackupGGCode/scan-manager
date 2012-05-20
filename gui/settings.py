@@ -1,210 +1,255 @@
-from .common import *
-
-from .dialogs import ProgressDialog
-import backend
-
-from pysideline.forms import *
-
-import base
-import log
-import copy
+"""
+WORK IN PROGRESS
+"""
 
 
-
-class FormData(BaseSettings):
-	pass
-
+from pysideline.forms import NOTSET
+import collections
 
 
-class SettingsData(BaseSettings):
-	pass
+class SettingsMetaclass(type): 
+	def __new__(cls, name, bases, dct):
+		d = {}
+		d['_contents'] = {}
+		for k,v in dct.items():
+			if type(v) is SettingsMetaclass or isinstance(v,quick):
+				d['_contents'][k] = v
+			else:
+				d[k] = v
+		return super(SettingsMetaclass, cls).__new__(cls, name, bases, d)
 
 
 
-def apiFromName(apiName):
-	api = [i for i in backend.apis if i.getName() == apiName]
-	if not api: 
-		return None
-	return api[0]
-
-
-def cameraFromName(api,cameraName):
-	if api is None:
-		return None
-	try:
-		camera = [i for i in api.getCameras() if i.getName() == cameraName]
-	except:
-		return None
-	if not camera: 
-		return None
-	return camera[0]
-
-
-def apiOptions(form):
-	out = [('not selected',None)]
-	if backend.apis:
-		out += [(api.getName(),api.getName()) for api in backend.apis]
-	return out
-
-
-def cameraOptions(apiField):
-	if apiField.getValue():
-		return [('not selected',None)]+[(camera.getName(),camera.getName()) for camera in apiFromName(apiField.getValue()).getCameras()]
-	else:
-		return [('chose an API first',None)]
-
-
-def CameraBox(title,suffix,**kargs):
-	return GroupBox(name='cameraBox%s'%suffix,groupData=False,title=title,contents=[
-		ComboBox(name='api%s'%suffix,label='Choose API:',options=apiOptions,required=True),
-		ComboBox(name='camera%s'%suffix,label='Choose Camera:',options=lambda f:cameraOptions(getattr(f,'api%s'%suffix)),depends=['options=api%s'%suffix],required=True),
-	],**kargs)
-
-
-SettingsForm = TabbedForm(name='main',documentMode=True,contents=[
-	Tab(name='tab1',label='Cameras',contents=[
-		ComboBox(name='mode',label='Operating mode:',options=[
-			('V: a camera for each side of the book',Mode.V),
-			('Flat: a single camera capturing two pages at a time)',Mode.Flat),
-			#('Alternate: a single camera capturing pages that need to be interpolated',Mode.Alternate),
-		]),
-		CameraBox('Left','L',hidden=lambda f:f.mode.getValue() != Mode.V,depends='hidden=mode'),
-		CameraBox('Right','R',hidden=lambda f:f.mode.getValue() != Mode.V,depends='hidden=mode'),
-		CameraBox('Centre','C',hidden=lambda f:f.mode.getValue() == Mode.V,depends='hidden=mode'),
-		File(name='outputDirectory',label='Output directory:',mode=FileMode.ExistingDirectory,required=True),
-		GridLayout(name='thumbnailSize',label='Thumbnail size:',groupData=True,contents=[
-			LineEdit(name='width',row=0,col=0,type=int,required=True),
-			LineEdit(name='height',row=0,col=1,type=int,required=True),
-		]),
-	]),
-	#Tab(name='tab2',label='Camera Controls',contents=[
-	#	TableView(name='cameraControls',tableActions=TableAction.All,formPosition=FormPosition.Bottom,
-	#		editForm=Form(name='cameraControlsForm',contentsMargins=QtCore.QMargins(0,11,0,11),contents=[
-	#			ComboBox(name='control',label='Control:',options=[]),
-	#			LineEdit(name='tab',label='Tab:',type=str),
-	#		]),
-	#		columns=[
-	#			Column(name='control',label='Control',resizeMode=QtGui.QHeaderView.Stretch),
-	#			Column(name='tab',label='Tab',resizeMode=QtGui.QHeaderView.Stretch),
-	#		],
-	#	),
-	#]),
-	#Tab(name='tab3',label='Save and Restore',contents=[
-	#]),
-])
-
-
-class SetupWindow(BaseWidget,QtGui.QWidget):
-	
-	def initialiseOptions(self):
-		self.form.apiL.recalculate()
-		self.form.apiR.recalculate()
-		self.form.apiC.recalculate()
-		self.loadSettings()
-
+class quick(object):
+	def __init__(self,**base):
+		self.base = base
 		
-	class Layout(BaseLayout,QtGui.QVBoxLayout):
-		def init(self):
-			self.setContentsMargins(0,0,0,0)
-			self._up.setLayout(self)
+	def __call__(self,*args,**kargs):
+		d = dict()
+		d.update(self.base)
+		d.update(kargs)
+		return Value(*args,**d)
 			
-	def init(self):
-		self.hide()
-		self.setWindowTitle(self.tr('ScanManager %s - settings')%smGetVersion())
-
-		self.form = SettingsForm(None)
-		self.Form = self.form.create(self)
-		self.Layout.addWidget(self.Form)
-		self.Layout.addWidget(self.Buttons)
-		#self.Form.setTabEnabled(1,False)
-		#self.Form.setTabEnabled(2,False)
+			
+			
+class BaseSetting(object):
 	
-						
-	class Buttons(BaseWidget,QtGui.QFrame):
+	__metaclass__ = SettingsMetaclass
 
-		class Layout(BaseLayout,QtGui.QBoxLayout):
-			args=(QtGui.QBoxLayout.LeftToRight,)
-			def init(self):
-				self._up.setLayout(self)
-			
-		class CancelButton(BaseWidget,QtGui.QPushButton):
-			def init(self):
-				self._up.Layout.addWidget(self)
-				self.setText(self.tr('Cancel'))
-				
-			def onclicked(self):
-				self.app.SetupWindow.close()
-				
-				
-		class ContinueButton(BaseWidget,QtGui.QPushButton):
-			def init(self):
-				self._up.Layout.addWidget(self)
-				self.setText(self.tr('Continue'))
-				self.setDefault(True)
-				
-			def onclicked(self):
-				error,data = self._up._up.form.getValueAndError()
-				if error:
-					out = ''
-					for k,v in data._errors.items():
-						field = getattr(self._up._up.form,k)
-						if v is True:
-							out += '%s is invalid\n'%(field.label)
-						else:
-							out += '%s %s\n'%(field.label or field.name,v)
-					QtGui.QMessageBox.critical(self,'Errors',out)
-					return
-				
-				#self._up._up.Form.setTabEnabled(1,True)
-				#self._up._up.Form.setCurrentIndex(1)
-				
-				print data._pp()
-				
-				progress = ProgressDialog(parent=self.app.SetupWindow,text='Connecting to cameras (may take some time for WIA)')
-				progress.open()
-				
-				self.app.setup = SettingsData()
-				self.app.setup.mode = data.mode
-				if data.mode == Mode.V:
-					self.app.setup.cameraL = cameraFromName(apiFromName(data.apiL),data.cameraL)
-					self.app.setup.cameraR = cameraFromName(apiFromName(data.apiR),data.cameraR)
-				else:
-					self.app.setup.cameraC = cameraFromName(apiFromName(data.apiC),data.cameraC)
-				self.app.setup.thumbnailSize = data.thumbnailSize
-				self.app.setup.outputDirectory = data.outputDirectory
-				self.app.SetupWindow.saveSettings(data)
-				
-				i = 3
-				progress.setValue(i)
-				for camera in self.app.cameras:
-					i += 3
-					progress.setValue(i)
-					camera.open()
-					camera.captureComplete.connect(self.app.MainWindow.captureCompleteCallback)
-					camera.viewfinderFrame.connect(self.app.MainWindow.viewfinderFrameCallback)
-					
-				progress.close()
-				
-				self.app.SetupWindow.close()
-				self.app.MainWindow.startShooting()
-				self.app.MainWindow.show()
 
-	#
-	# Window-level methods
-	#			
-					
-	def saveSettings(self,data):
-		"""
-		Save current settings in the the app's shelve db
-		"""
-		self.app.settings.setup = data
+
+class Settings(BaseSetting):
+	
+	def __init__(self,parent=None,name=None):
+		self.__dict__['_parent'] = parent
+		self.__dict__['_name'] = name
+		self.__dict__['_children'] = collections.OrderedDict()
+		
+		for k,v in self._contents.items():
+			self._children[k] = v(parent=self,name=k)
+	
+	def __getattr__(self,k):
+		if k not in self._children:
+			raise AttributeError(k)
+		
+		return self._children[k]._getValue()
+	
+	def __setattr__(self,k,v):
+		if k not in self._children:
+			raise AttributeError(k)
+		
+		return self._children[k]._setValue(v)
 		
 	
-	def loadSettings(self):
-		"""
-		Load previous settings from the the app's shelve db
-		"""
-		if 'setup' not in self.app.settings:
+	def _getValue(self):
+		return self
+	
+	
+	def _setValue(self,v):
+		if v == NOTSET:
+			for k,v in self._children:
+				v._setValue(v)
 			return
-		self.form.setValue(self.app.settings.setup)
+		
+		for k,v in v.items():
+			self._children[k]._setValue(v)
+	
+	
+	def _update(self,d):
+		for k,v in d.items():
+			self._childern[k]._setValue(v)
+		
+	
+	def _activate(self,app):
+		for v in self._children.values():
+			v._activate(app=app)
+		
 
+
+class SettingsDict(Settings):
+	
+	def __init__(self,parent,name):
+		self.__dict__['_parent'] = parent
+		self.__dict__['_name'] = name
+		self.__dict__['_data'] = dict()
+		
+		
+	def __setitem__(self,k,v):
+		nv = self._contents['value'](name='value',parent=self)
+		nv._setValue(v)
+		
+		self._data[k] = nv
+		
+		
+	def __getitem__(self,k):
+		return self._data[k]
+
+	
+	def __contains__(self,k):
+		return k in self._data
+	
+	
+	def __len__(self):
+		return len(self._data)
+	
+	
+	def _setValue(self,v):
+		self._data = dict()
+
+		if v == NOTSET:
+			return
+		
+		self.update(v)
+	
+	
+	def items(self):
+		return self.k.items()
+
+
+	def udpate(self,d):
+		for k,v in d:
+			self[k] = v
+
+
+	def new(self,k):
+		nv = self._contents['value'](name='value',parent=self)
+		self._data[k] = nv
+		return nv
+
+
+	def __delitem__(self,k):
+		del(self._data[k])
+
+
+	def _activate(self,app):
+		if not isinstance(self._contents['value'],Settings):
+			return
+		for v in self._data.values():
+			v._activate(app=app)
+		
+
+
+class SettingsList(SettingsDict):
+	def __init__(self,parent,name):
+		Settings.__init__(self,parent=parent,name=name)
+		self.__dict__['_data'] = list()
+
+	
+	def append(self,v=None):
+		nv = self._contents['value'](name='value',parent=self)
+		if v is not None:
+			nv._setValue(v)
+		self._data.append(nv)
+		return nv
+
+		
+	def _setValue(self,v):
+		self._data = dict()
+
+		if v == NOTSET:
+			return
+		
+		for i in v:
+			self.append(i)
+	
+	def _activate(self,app):
+		if not isinstance(self._contents['value'],Settings):
+			return
+		for i in self._data:
+			i._activate(app=app)
+	
+
+
+class Value(BaseSetting):
+	
+	def __init__(self,name,parent,type=None,default=NOTSET):
+		self.name = name
+		self.parent = parent
+		self.type = type
+		self.default = default
+		if default != NOTSET:
+			self.value = self.default
+
+		
+	def _getValue(self):
+		if not hasattr(self,'value'):
+			raise Exception('%s has not been set'%self.name)
+		return self.value
+
+		
+	def _setValue(self,v):
+		if v == NOTSET:
+			delattr(self,'value')
+		if self.type is not None:
+			if not isinstance(v,self.type):
+				raise Exception('%s expects values of type %s'%(self.name,self.type))
+		self.value = v
+
+
+	def _activate(self,app):
+		return
+			
+			
+
+class SMSettings(Settings):
+	
+	class application(Settings):
+		pass
+	
+		
+	class project(Settings):
+		outputDirectory = quick(type=unicode)
+		class thumbnailSize(Settings):
+			width = value(type=int,default=100) 
+			height = value(type=int,default=100) 
+
+		
+	class camera(SettingsDict):
+		
+		class value(Settings):
+			apiName = quick(type=unicode)
+			cameraName = quick(type=unicode)
+			rotate = quick(type=int,default=0)
+
+			class pipelineSettings(Settings):			
+				undistort = quick(type=object,default=None)
+				class crop(Settings):
+					top = quick(type=int,default=0)
+					left = quick(type=int,default=0)
+					bottom = quick(type=int,default=0)
+					right = quick(type=int,default=0)
+				
+			@property
+			def camera(self):
+				return self.app.getCameraByName(self.apiName,self.cameraName)
+		
+		
+		
+if __name__ == '__main__':
+	s = SMSettings()
+	s.current.cameras.new(0)
+	print s.current.cameras[0]
+	print s.current.cameras[0].crop
+	s.current.cameras[0].rotate = 11
+	print s.current.cameras[0].rotate
+	

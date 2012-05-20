@@ -50,7 +50,7 @@ class _DoubleSpinBox(BaseWidgetField):
 	
 		
 	def setRawValue(self,v):
-		if v is NOTSET or v is None:
+		if v == NOTSET or v is None:
 			self._qt.clear()
 		else:
 			self._qt.setValue(v)

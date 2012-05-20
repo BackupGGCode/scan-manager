@@ -9,11 +9,21 @@ import inspect
 class __NOTSET(object):
 	def __nonzero__(self):
 		return False
+	def __eq__(self,other):
+		if isinstance(other,self.__class__):
+			return True
+		else:
+			return False
 NOTSET = __NOTSET()
 
 class __NOTSTORED(object):
 	def __nonzero__(self):
 		return False
+	def __eq__(self,other):
+		if isinstance(other,self.__class__):
+			return True
+		else:
+			return False
 NOTSTORED = __NOTSTORED()
 
 
@@ -26,8 +36,9 @@ class ConfigurationError(Exception):
 class FormData(object):
 	
 	def __init__(self,**kargs):
-		self.__dict__['_data'] = kargs
+		self.__dict__['_data'] = collections.OrderedDict()
 		self.__dict__['_errors'] = collections.OrderedDict()
+		self.__dict__['_data'].update(kargs)
 	
 	
 	def _setValue(self,k,v):
@@ -55,13 +66,34 @@ class FormData(object):
 	def _items(self):
 		return self._data.items()
 
+	def __hasattr__(self,k):
+		return k in self._data
+	
 	def __getattr__(self,k):
+		if k not in self.__dict__['_data']:
+			raise AttributeError(k)
 		return self._data[k]
 	
 	def __setattr__(self,k,v):
-		if k not in self._data:
+		if k not in self.__dict__['_data']:
 			raise AttributeError(k)
 		self._data[k] = v 
+		
+	def __getstate__(self):
+		return self.__dict__
+	
+	def __setstate__(self,d):
+		self.__dict__.update(d)
+		
+	def __iter__(self):
+		for k in self._data.keys():
+			yield k
+			
+	def __getitem__(self,k):
+		return self._data[k]
+	
+	def __setitem__(self,k,v):
+		self._data[k] = v
 
 
 
@@ -87,8 +119,11 @@ class _Properties(object):
 		
 		for propertyFactory in expandedArgs:
 			property = propertyFactory(field,self)
-			if property.name in self.contents:
-				raise Exception('Property %s already exists in %s'%(property.name,self.field.__class__.__name__))
+			
+			# Commented out to allow overriding of properties
+			#if property.name in self.contents:
+			#	raise Exception('Property %s already exists in %s'%(property.name,self.field.__class__.__name__))
+			
 			self.contents[property.name] = property
 			
 			
@@ -175,7 +210,7 @@ class _Property(object):
 	def set(self,v=NOTSET,firstTime=False):
 		
 		# Validate value 
-		if v is NOTSET and self.required:
+		if v == NOTSET and self.required:
 			raise self.configurationError('require %s to be set'%self.name)
 
 		if getattr(self,'type',None) is not callable and not isinstance(v,Factory):
@@ -261,7 +296,7 @@ class _QtProperty(_Property):
 			self.toQt(self.field._qt)
 	
 	def toQt(self,q):
-		if self.value is NOTSET:
+		if self.value == NOTSET:
 			return
 		if getattr(self,'target',None):
 			for i in self.target.split('.'):
@@ -377,9 +412,9 @@ class Configurable(object):
 
 		for property in self._properties.values():
 			v = kargs.get(property.name,NOTSET)
-			if v is NOTSET and hasattr(property,'default') and property.default is not NOTSET:
+			if v == NOTSET and hasattr(property,'default') and property.default != NOTSET:
 				v = property.default
-			if v is NOTSET:
+			if v == NOTSET:
 				continue
 			property.set(v,firstTime=True) # firstTime is set so don't calculate any calculated properties
 			if property.recalculable:
@@ -421,7 +456,7 @@ class Configurable(object):
 		
 		
 	def __repr__(self):
-		return '<%s %s>'%(self.__class__.__name__[1:],self.name)
+		return '<%s %s>'%(self.__class__.__name__[1:],getattr(self,'name',hex(id(self))))
 
 #
 # Common properties
@@ -465,12 +500,15 @@ Properties.widget = Properties(
 	QtProperty(name='fixedSize',type=QtCore.QSize),
 	QtProperty(name='fixedWidth',type=int),
 	QtProperty(name='fixedHeight',type=int),
+	QtProperty(name='minimumSizeHint',type=QtCore.QSize),
 	QtProperty(name='minimumSize',type=QtCore.QSize),
 	QtProperty(name='minimumWidth',type=int),
 	QtProperty(name='minimumHeight',type=int),
+	QtProperty(name='maximumSizeHint',type=QtCore.QSize),
 	QtProperty(name='maximumSize',type=QtCore.QSize),
 	QtProperty(name='maximumWidth',type=int),
 	QtProperty(name='maximumHeight',type=int),
+
 )
 
 
@@ -599,7 +637,7 @@ class BaseField(Configurable):
 				
 		depends = self.depends
 		
-		if depends is NOTSET:
+		if depends == NOTSET:
 			return
 		
 		if type(depends) not in (list,tuple):
@@ -710,7 +748,7 @@ class BaseWidgetField(BaseField):
 	def initValidator(self):
 		if self.validator is None:
 			return
-		if self.validator is NOTSET:
+		if self.validator == NOTSET:
 			if self.type is int:
 				validator = QtGui.QIntValidator(self._qt)
 			elif self.type is float:
@@ -808,8 +846,11 @@ class BaseWidgetField(BaseField):
 		self._qt.setHidden(v)
 		if getattr(self,'_label',None):
 			self._label.setHidden(v)
-		self.form._qt.adjustSize()
-		self.form._qt.parent().adjustSize()
+			
+		o = self
+		while o:
+			o._qt.adjustSize()
+			o = o.parent
 			
 			
 	def _get_hidden(self):
@@ -898,8 +939,9 @@ class _AbstractGroup(BaseWidgetField):
 
 	
 	def layoutChildren(self):
-		self._qt.Layout = QtGui.QFormLayout()
-		self._qt.setLayout(self._qt.Layout)
+		if not getattr(self._qt,'Layout',None):
+			self._qt.Layout = QtGui.QFormLayout()
+			self._qt.setLayout(self._qt.Layout)
 		
 		for field in self._children.values():
 			if getattr(field,'label',None):
@@ -919,7 +961,7 @@ class _AbstractGroup(BaseWidgetField):
 			if field.hidden:
 				continue
 			error,value = field.getValueAndError(mark=mark)
-			if value is NOTSTORED:
+			if value == NOTSTORED:
 				continue
 			if isinstance(value,FormData) and not field.groupData:
 				data._data.update(value._data)

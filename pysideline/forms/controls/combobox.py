@@ -2,7 +2,7 @@ from .common import *
 
 class _ComboOptions(base._QtProperty):
 	def toQt(self,q):
-		if self.value is NOTSET:
+		if self.value == NOTSET:
 			return
 		q.clear()
 		for ndx,item in enumerate(self.value):
@@ -76,17 +76,18 @@ class _ComboBox(BaseWidgetField):
 		
 	def setRawValue(self,v):
 		if self.textAsValue:
-			if v is NOTSET or v is None:
+			if v == NOTSET or v is None:
 				self._qt.lineEdit().clear()
 			else:
 				self._qt.lineEdit().setText(v)
 		else:
-			if v is NOTSET or v is None:
+			if v == NOTSET or v is None:
 				self._qt.setCurrentIndex(0)
 				return
 			index = self._qt.findData(v)
 			if index == -1:
-				raise KeyError(v)
+				return
+				#raise KeyError(v)
 			self._qt.setCurrentIndex(index)
 
 	def clear(self):

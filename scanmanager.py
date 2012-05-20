@@ -81,15 +81,21 @@ if __name__ == '__main__':
 			app.allDone = True # to kill the processing thread
 		except:
 			pass
-		if backend.apis:
-			for api in backend.apis:
-				try: api.saveSettings()
+		try:
+			if backend.apis:
+				for api in backend.apis:
+					try: api.saveSettings()
+					except: pass
+					try: api.close()
+					except: pass
+		except:
+			pass
+		try:
+			for thread in getattr(app,'captureThreads',{}).values():
+				try: thread.stop()
 				except: pass
-				try: api.close()
-				except: pass
-		for thread in getattr(app,'captureThreads',{}).values():
-			try: thread.stop()
-			except: pass
+		except:
+			pass
 		try: app.settings.save()
 		except: pass
 		try: app.db.close()

@@ -3,6 +3,13 @@ from . import cameracontrols
 from . import imageviewer
 from . import processing 
 import log
+import time
+
+try:
+	import chdkconsole
+except:
+	pass 
+
 
 try:
 	from . import calibrate
@@ -44,7 +51,11 @@ class CameraControls(BaseWidget,QtGui.QTabWidget):
 			
 		self.camera.propertiesChanged.connect(self.onProperiesChanged)
 		
-		
+		if self.camera.api.getId() == 'chdk':
+			console = chdkconsole.CHDKConsole(camera=camera,parent=self)
+			self.addTab(console,'CHDK console')
+
+
 	def onProperiesChanged(self,event):
 		properties = event.getProperties()
 		for property in properties:
@@ -68,12 +79,14 @@ class CameraControlsTab(BaseWidget,QtGui.QWidget):
 	class CameraControlsTabScroll(BaseWidget,QtGui.QScrollArea):
 		def init(self):
 			self._up.Layout.addWidget(self,1)
+			self.setWidgetResizable(False)
 			self.setContentsMargins(0,0,0,0)
 			
 		class CameraControlsTabMainArea(BaseWidget,QtGui.QWidget):
 			
 			class Layout(BaseLayout,QtGui.QFormLayout):
 				def init(self):
+					self.setFieldGrowthPolicy(QtGui.QFormLayout.FieldsStayAtSizeHint)
 					self._up.setLayout(self)
 		
 			def init(self):
@@ -89,24 +102,49 @@ class GeneralTab(CameraControlsTab):
 			
 			def init(self):
 				CameraControlsTab.CameraControlsTabScroll.CameraControlsTabMainArea.init(self)
-				
+
 			def getCameraIndex(self):
 				return self.app.cameras.index(self._up._up._up.camera)+1
+			
+			class StartViewfinder(BaseWidget,QtGui.QPushButton):
+				def init(self):
+					self._up.Layout.addRow(self)
+					self.setText(self.tr('Start viewfinder'))
+					if not self.aq.camera.hasViewfinder():
+						self.hide()
+					
+				def onclicked(self):
+					self.aq.camera.startViewfinder()
 				
+					
+			class StopViewfinder(BaseWidget,QtGui.QPushButton):
+				def init(self):
+					self._up.Layout.addRow(self)
+					self.setText(self.tr('Stop viewfinder'))
+					if not self.aq.camera.hasViewfinder():
+						self.hide()
+					
+				def onclicked(self):
+					self.aq.camera.stopViewfinder()
+					viewfinder = getattr(self.app,'Viewfinder%d'%(self._up.getCameraIndex()))
+					viewfinder.hide()
 				
+					
 			class Rotate(BaseWidget,QtGui.QComboBox):
 				
 				def init(self):
 					self._up.Layout.addRow(self.tr('Rotation (for new images):'),self)
+					self.blockSignals(True)
 					self.addItem(self.tr('No rotation'),0)
 					self.addItem(self.tr('90 CW'),90)
 					self.addItem(self.tr('180'),180)
 					self.addItem(self.tr('90 CCW'),270)
-					if self._up.getCameraIndex() in self.app.settings.rotate: 
-						self.setCurrentIndex(self.findData(self.app.settings.rotate[self._up.getCameraIndex()]))
+					if 'rotate' in self.aq.camera.settings:
+						self.setCurrentIndex(self.findData(self.aq.camera.settings.rotate))
+					self.blockSignals(False)
 				def oncurrentIndexChanged(self,index):
 					angle = self.itemData(index)
-					self.app.settings.rotate[self._up.getCameraIndex()] = angle
+					self.aq.camera.settings.rotate = angle
 			
 					
 			class CalibrationControlsBox(BaseWidget,QtGui.QGroupBox):
@@ -116,6 +154,7 @@ class GeneralTab(CameraControlsTab):
 	
 				class Layout(BaseLayout,QtGui.QFormLayout):
 					def init(self):
+						self.setFieldGrowthPolicy(QtGui.QFormLayout.FieldsStayAtSizeHint)
 						self._up.setLayout(self)
 			
 				class CalbrationStateLabel(BaseWidget,QtGui.QLabel):
@@ -126,11 +165,13 @@ class GeneralTab(CameraControlsTab):
 						self.app.calibrationDataChanged.connect(self.update)
 						
 					def update(self):
-						cameraIndex = self._up._up.getCameraIndex()
-						if self.app.settings.calibrators[cameraIndex] and self.app.settings.calibrators[cameraIndex].isReady():
+						if self.aq.camera.settings.get('undistort',None) and self.aq.camera.settings.undistort.isReady():
 							self.setText(self.tr('<p>Calibration configured</p>'))
+							self._up.CorrectCheckbox.setEnabled(True)
 						else:
 							self.setText(self.tr('<p>No calibration configured</p>'))
+							self._up.CorrectCheckbox.setChecked(False)
+							self._up.CorrectCheckbox.setEnabled(False)
 	
 	
 				class CorrectCheckbox(BaseWidget,QtGui.QCheckBox):
@@ -138,22 +179,19 @@ class GeneralTab(CameraControlsTab):
 						self._up.Layout.addRow(self)
 						self.setText(self.tr('Correct images using calibration data'))
 						self.app.calibrationDataChanged.connect(self.update)
-						cameraIndex = self._up._up.getCameraIndex()
-						if self.app.settings.calibrators[cameraIndex] and self.app.settings.calibrators[cameraIndex].isActive():
+						if 'undistort' in self.aq.camera.settings and self.aq.camera.settings.undistort.isActive():
 							self.setChecked(True)
 						else:
 							self.setChecked(False) 
 						
 						
 					def onstateChanged(self):
-						cameraIndex = self._up._up.getCameraIndex()
-						if self.app.settings.calibrators[cameraIndex]:
-							self.app.settings.calibrators[cameraIndex].setActive(self.isChecked())
+						if 'undistort' in self.aq.camera.settings:
+							self.aq.camera.settings.undistort.setActive(self.isChecked())
 							
 	
 					def update(self):
-						cameraIndex = self._up._up.getCameraIndex()
-						if self.app.settings.calibrators[cameraIndex] and self.app.settings.calibrators[cameraIndex].isReady():
+						if 'undistort' in self.aq.camera.settings.undistort and self.aq.camera.settings.undistort.isReady():
 							self.show()
 						else:
 							self.hide()
@@ -163,7 +201,8 @@ class GeneralTab(CameraControlsTab):
 					def init(self):
 						self._up.Layout.addRow(self)
 						self.setText(self.tr('Calibrate with current image'))
-						self.setChecked(self.app.settings.crop.get('enabled',False))
+						if 'undistort' in self.aq.camera.settings and self.aq.camera.settings.undistort.isActive():
+							self.setChecked(True)
 						
 					def onclicked(self):
 						if calibrate is None:
@@ -192,10 +231,13 @@ class GeneralTab(CameraControlsTab):
 			class CropControlsBox(BaseWidget,QtGui.QGroupBox):
 				
 				def init(self):
+					if 'crop' not in self.aq.camera.settings:
+						self.aq.camera.settings.crop = BaseSettings()
 					self._up.Layout.addRow(self)
 	
 				class Layout(BaseLayout,QtGui.QFormLayout):
 					def init(self):
+						self.setFieldGrowthPolicy(QtGui.QFormLayout.FieldsStayAtSizeHint)
 						self._up.setLayout(self)
 			
 	
@@ -203,33 +245,30 @@ class GeneralTab(CameraControlsTab):
 					def init(self):
 						self._up.Layout.addRow(self)
 						self.setText(self.tr('Crop images'))
-						self.setChecked(self.app.settings.crop.get('enabled',False))
+						if 'crop' in self.aq.camera.settings:
+							self.setChecked(self.aq.camera.settings.crop.get('enabled',False))
 						
 					def onstateChanged(self):
 						if self.isChecked():
 							self._up.CropSpinners.update()
-							self.app.settings.crop.enabled = True
+							self.aq.camera.settings.crop.enabled = True
 						else:
-							self.app.settings.crop.enabled = False
+							self.aq.camera.settings.crop.enabled = False
 					
 					
 				class CropSpinners(BaseWidget,QtGui.QWidget):
 					def init(self):
 						self._up.Layout.addRow(self)
-						cameraIndex = self._up._up.getCameraIndex()
-						if not self.app.settings.crop.get('coords',None) or cameraIndex not in self.app.settings.crop.coords:
+						if 'crop' not in self.aq.camera.settings or not self.aq.camera.settings.crop.get('coords',None):
 							return
-						c = self.app.settings.crop.coords[cameraIndex]
+						c = self.aq.camera.settings.crop.coords
 						self.Left.setValue(c[0])
 						self.Top.setValue(c[1])
 						self.Right.setValue(c[2])
 						self.Bottom.setValue(c[3])
 						
 					def update(self):
-						cameraIndex = self._up._up.getCameraIndex()
-						if not self.app.settings.crop.get('coords',None):
-							self.app.settings.crop.coords = {}
-						self.app.settings.crop.coords[cameraIndex] = (self.Left.value(),self.Top.value(),self.Right.value(),self.Bottom.value())
+						self.aq.camera.settings.crop.coords = (self.Left.value(),self.Top.value(),self.Right.value(),self.Bottom.value())
 					
 					class Layout(BaseLayout,QtGui.QGridLayout):
 						def init(self):
@@ -269,3 +308,6 @@ class GeneralTab(CameraControlsTab):
 					ndx = self._up.getCameraIndex()
 					image = self.app.imageManager.selected
 					self.app.processingQueue.put(processing.PostCaptureJob(self.app,image,ndx))
+
+					
+ 

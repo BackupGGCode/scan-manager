@@ -18,11 +18,11 @@ class CalibrateDialog(BaseDialog,QtGui.QDialog):
 		self.setWindowTitle(self.tr('ScanManager %s - calibration')%smGetVersion())
 		self.resize(600,600)
 	
-	def go(self,pm,cameraIndex=1):
+	def go(self,pm,camera):
 		
-		self.cameraIndex = cameraIndex
+		self.camera = camera
 
-		c = self.app.settings.calibrators[cameraIndex]
+		c = self.camera.settings.calibrators
 		if not hasattr(c,'realSizeMM') or not hasattr(c,'chessboardSize'):
 			# this can happen with some calibration failures
 			c = None
@@ -36,7 +36,7 @@ class CalibrateDialog(BaseDialog,QtGui.QDialog):
 			self.realSizeMM=[169.0,254.0]
 			self.chessboardSize=[17,25]
 			
-		self.app.settings.calibrators[cameraIndex] = self.calibrator
+		self.camera.calibrators = self.calibrator
 			
 		self.Viewers.CalibrateBefore.loadFromData(pm)
 		self.original = pm
@@ -66,7 +66,7 @@ class CalibrateDialog(BaseDialog,QtGui.QDialog):
 		self.close()
 		
 	def doClear(self):
-		self.app.settings.calibrators[self.cameraIndex] = None
+		self.camera.settings.calibrators = None
 		self.app.calibrationDataChanged.emit()
 		self.close()
 		

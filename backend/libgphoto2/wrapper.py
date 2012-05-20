@@ -90,6 +90,7 @@ class Camera(interface.Camera):
 		self.camera = camera
 		self.viewfinderThread = None
 		self.opened = False
+		self.inited = False
 		self.afterOpened = False
 		self.config = None
 		self.configWidgets = {} 
@@ -97,24 +98,28 @@ class Camera(interface.Camera):
 		self.capturedAuxFiles = []
 		
 		self.hasCaptureEvents = None #: None means automatically guess whether capture events are supported
+		
+		self.name = '%s %s'%(self.camera.getModel(),self.camera.getPort())
+		
+		self.init()
+		
+		try:
+			self.name = '%s %s'%(self.camera.getModel(),self.configWidgets['ownername']['value'])
+		except:
+			pass
 
 		
-	def getName(self):	
-		return '%s %s'%(self.camera.getModel(),self.camera.getPort())
+	def getName(self):
+		return self.name
 	
 	
 	def open(self):
 		if self.opened:
 			return
+		
+		self.init()
+		
 		self.opened = True
-		self.camera.init()
-		self.afterOpened = True
-		self.properties = []
-		self.nameToProperty = {}
-
-		# fetch current camera config
-		self.configurationFromCamera()
-
 		# try to wake the camera up so we get a complete set of properties to work with
 		changed = False
 		if 'capture' in self.configWidgets and self.configWidgets['capture']['value'] != 1:
@@ -125,9 +130,22 @@ class Camera(interface.Camera):
 			self.configurationToCamera()
 			self.configurationFromCamera()
 
+		if 'savedProperties' in self.settings:
+			self.restoreProperties()
+			self.configurationToCamera()
+			"""
+			try:
+				self.restoreProperties()
+				self.configurationToCamera()
+			except:
+				log.logException('Error attempting to restore properties:\n%s'%'\n'.join('  %s=%s'%(name,value) for name,value in self.settings.savedProperties),log.ERROR)
+			"""
+
 		# now create new CameraProperty instances in self.properties based on the configuration we just retrieved
 		self.createProperties()
 		
+		self.afterOpened = True
+
 
 	def hasViewfinder(self):
 		return True
@@ -150,8 +168,9 @@ class Camera(interface.Camera):
 
 	
 	def close(self):
-		if not self.opened:
+		if not self.inited:
 			return
+		
 		try:
 			self.viewfinderThread.stopped = True
 		except: 
@@ -163,15 +182,12 @@ class Camera(interface.Camera):
 				self.configurationToCamera()
 		except:
 			log.logException('unable to turn off capture mode', log.WARNING)
-		self.afterOpened = False
+		self.inited = False
 		self.opened = False
 		self.camera.exit()
 			
 	
 	def ontimer(self):
-		"""
-
-		"""
 		
 		if not self.afterOpened:
 			return
@@ -206,6 +222,10 @@ class Camera(interface.Camera):
 				
 				
 	def startViewfinder(self):
+		if 'output' in self.configWidgets and 'LCD' in self.configWidgets['output']['choices'] and self.configWidgets['output']['value'] != 'LCD': 
+			self.configWidgets['output']['value'] = 'LCD'
+			self.configWidgets['output']['changed'] = True
+			self.configurationToCamera()
 		if self.viewfinderThread and not self.viewfinderThread.stopped:
 			return 
 		self.viewfinderThread = ViewfinderCaptureThread(self)
@@ -228,6 +248,19 @@ class Camera(interface.Camera):
 	#
 	
 
+	def init(self):
+		if self.inited:
+			return
+		self.inited = True
+		self.camera.init()
+		self.afterOpened = True
+		self.properties = []
+		self.nameToProperty = {}
+
+		# fetch current camera config
+		self.configurationFromCamera()
+		
+	
 	def configurationToCamera(self):
 		n = 0
 		toClear = []
@@ -289,6 +322,32 @@ class Camera(interface.Camera):
 	
 	def getPropertyByName(self,name):
 		return self.nameToProperty[name]
+	
+	
+	savedProperties = [
+		'imagequality','imagesize','iso','whitebalance','zoom','shootingmode','aperture','shutterspeed','afdistance'
+	]
+	
+	
+	def saveSettings(self):
+		saved = []
+		for name in self.savedProperties:
+			if name not in self.configWidgets:
+				continue
+			value = self.configWidgets[name]['value']
+			saved.append((name,value))
+		self.settings.savedProperties = saved
+		
+		
+	def restoreProperties(self):
+		if 'savedProperties' not in self.settings:
+			return
+		saved = list(self.settings.savedProperties)
+		saved.reverse()
+		for name,value in saved:
+			self.configWidgets[name]['value'] = value
+			self.configWidgets[name]['changed'] = True
+		
 	
 	
 	
@@ -433,42 +492,4 @@ class GPhotoCameraButton(GPhotoCameraValueProperty):
 		self.camera.configurationFromCamera()
 		
 
-class StartViewfinder(GPhotoCameraButton):
-	propertyId = '_START_VIEWFINDER'
-	name = 'Start viewfinder'
-	section = 'Camera Actions'
-	controlType = interface.ControlType.Button
-	def getName(self):
-		return self.name
-	def getId(self):
-		return self.propertyId
-	def getControlType(self):
-		return interface.ControlType.Button
-	def isReadOnly(self):
-		return not self.camera.hasViewfinder()
-	def setRawValue(self,value):
-		self.camera.startViewfinder()
-	def getSection(self):
-		return self.section
-
-		
-class StopViewfinder(GPhotoCameraButton):
-	propertyId = '_STOP_VIEWFINDER'
-	name = 'Stop viewfinder'
-	section = 'Camera Actions'
-	controlType = interface.ControlType.Button
-	def getName(self):
-		return self.name
-	def getId(self):
-		return self.propertyId
-	def getControlType(self):
-		return interface.ControlType.Button
-	def isReadOnly(self):
-		return not self.camera.hasViewfinder()
-	def setRawValue(self,value):
-		self.camera.stopViewfinder()
-	def getSection(self):
-		return self.section
-		
-
-API.propertyClasses = [StartViewfinder,StopViewfinder]
+API.propertyClasses = []

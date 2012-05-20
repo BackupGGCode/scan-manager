@@ -16,10 +16,10 @@ class _TextEdit(BaseWidgetField):
 		QtProperty(name='cursorWidth',type=bool),
 		QtProperty(name='documentTitle',type=str),
 		QtProperty(name='lineWrapColumnOrWidth',type=int),
-		QtProperty(name='lineWrapMode',type=int,options=[QtGui.QTextEdit.NoWrap,QtGui.QTextEdit.WidgetWidth,QtGui.QTextEdit.FixedPixelWidth,QtGui.QTextEdit.FixedColumnWidth]),
+		QtProperty(name='lineWrapMode',options=[QtGui.QTextEdit.NoWrap,QtGui.QTextEdit.WidgetWidth,QtGui.QTextEdit.FixedPixelWidth,QtGui.QTextEdit.FixedColumnWidth]),
 		QtProperty(name='overwriteMode',type=bool),
 		QtProperty(name='readOnly',type=bool,getter='isReadOnly'),
-		QtProperty(name='textInteractionFlags',type=int,flags=[
+		QtProperty(name='textInteractionFlags',flags=[
 			Qt.NoTextInteraction,Qt.TextSelectableByMouse,Qt.TextSelectableByKeyboard,Qt.LinksAccessibleByMouse,Qt.LinksAccessibleByKeyboard,Qt.TextEditable,
 			Qt.TextEditorInteraction,Qt.TextBrowserInteraction]
 		),

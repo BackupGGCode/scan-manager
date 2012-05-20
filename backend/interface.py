@@ -125,6 +125,9 @@ class API(object):
 
 	def saveSettings(self):
 		""" Save persistent settings from the app's settings db """
+		for camera in self.getCameras():
+			if camera.opened:
+				camera.saveSettings()
 		if not getattr(self,'_settings',None):
 			return
 		key = 'APISettings:%s'%(self.getName())
@@ -302,6 +305,9 @@ class Camera(QObject):
 		""" This method is executed periodically on each active camera so it can take care of any periodic activities """
 		pass
 
+	def saveSettings(self):
+		""" This method is called for all cameras when the API is closing to allow the camera time to save any settings it needs to save """
+		pass 
 	
 	@property
 	def settings(self):

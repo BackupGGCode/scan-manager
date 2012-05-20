@@ -19,7 +19,7 @@ def smGetSettingsVersion():
 
 
 
-class NODEFAULT:
+class _NODEFAULT:
 	"""
 	Used in keyword argument lists so we can detect whether a keyword argument was supplied by doing::
 	
@@ -28,8 +28,9 @@ class NODEFAULT:
 	(The usual C{def f(x=None): ...} can't easily distinguish f(None) and f().)
 	    
 	"""
-	pass
-
+	def __nonzero__(self):
+		return False
+NODEFAULT = _NODEFAULT
 
 	
 class ScanManagerError(Exception):
@@ -82,6 +83,12 @@ class BaseSettings(object):
 		self.__dict__[k] = v
 	def __contains__(self,k):
 		return k in self.__dict__
+	def get(self,k,default=NODEFAULT):
+		if default is NODEFAULT:
+			return self.__dict__.get(k)
+		else:
+			return self.__dict__.get(k,default)
+		
 			
 			
 def indent(s,prefix='  ',stripInitialWhitespace=False):

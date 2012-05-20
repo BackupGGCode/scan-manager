@@ -38,10 +38,27 @@ class _Label(BaseWidgetField):
 	
 	def getRawValue(self):
 		return NOTSTORED
+		
+	def setRawValue(self,v):
+		pass
+
+	def clear(self):
+		pass
+
+	
+class Label(Factory):
+	klass = _Label
+
+
+
+class _Static(_Label):
+	
+	def getRawValue(self):
+		return NOTSTORED
 
 		
 	def setRawValue(self,v):
-		if v is NOTSET or v is None:
+		if v == NOTSET or v is None:
 			self._qt.clear()
 		else:
 			self._qt.setText(v)
@@ -50,8 +67,6 @@ class _Label(BaseWidgetField):
 	def clear(self):
 		self._qt.clear()
 
-class Label(Factory):
-	klass = _Label
-
-
+class Static(Factory):
+	klass = _Static
 

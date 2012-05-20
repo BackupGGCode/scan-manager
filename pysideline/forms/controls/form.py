@@ -20,6 +20,20 @@ class _Form(base._AbstractGroup):
 	def form(self):
 		return self
 
+
+	def showErrorPopup(self,data):
+		if not data._errors:
+			return False
+		out = ''
+		for k,v in data._errors.items():
+			field = getattr(self,k)
+			if v is True:
+				out += '%s is invalid\n'%(field.label)
+			else:
+				out += '%s %s\n'%(field.label or field.name,v)
+		QtGui.QMessageBox.critical(self,'Errors',out)
+		return True
+
 class Form(Factory):
 	klass = _Form
 
@@ -76,7 +90,8 @@ class _Tab(base._AbstractGroup):
 		Properties.formLayout,
 		Properties.widget,
 		
-		Property(name='icon',type=QtGui.QIcon)
+		Property(name='icon',type=QtGui.QIcon),
+		QtProperty(name='enabled',type=bool,target='_field',setter='setEnabled',getter='getEnabled'),
 	)
 
 	def markError(self,error):
@@ -87,9 +102,58 @@ class _Tab(base._AbstractGroup):
 	def clearError(self):
 		tabIndex = self._qt.parent().parent().indexOf(self._qt)
 		self._qt.parent().parent().setTabIcon(tabIndex,QtGui.QIcon())
+		
+	
+	def getEnabled(self):
+		tabw = self._qt.parent().parent()
+		index = tabw.indexOf(self._qt)
+		return tabw.isTabEnabled(index)
+
+
+	def setEnabled(self,v):
+		tabw = self._qt.parent().parent()
+		index = tabw.indexOf(self._qt)
+		tabw.setTabEnabled(index,v)
 
 class Tab(Factory):
 	klass = _Tab
 
 
 
+class ScrollTabWidget(BaseWidget,QtGui.QWidget):
+	
+	def init(self):
+		self.Layout = self.Scroll.Main.Layout
+	
+	class LocalLayout(BaseLayout,QtGui.QVBoxLayout):
+		def init(self):
+			self._up.setLayout(self)
+			self.setSpacing(0)
+			self.setContentsMargins(0,0,0,0)
+			
+	class Scroll(BaseWidget,QtGui.QScrollArea):
+		def init(self):
+			self._up.LocalLayout.addWidget(self,1)
+			self.setWidgetResizable(True)
+			self.setContentsMargins(0,0,0,0)
+			
+		class Main(BaseWidget,QtGui.QFrame):
+			
+			class Layout(BaseLayout,QtGui.QFormLayout):
+				def init(self):
+					self._up.setLayout(self)
+		
+			def init(self):
+				self._up.setWidget(self)
+				
+
+class _ScrollTab(_Tab):
+	
+	QtClass = ScrollTabWidget
+
+	def layoutChildren(self):
+		_Tab.layoutChildren(self)
+		self._qt.Scroll.Main.adjustSize()
+
+class ScrollTab(Factory):
+	klass = _ScrollTab

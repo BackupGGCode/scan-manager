@@ -306,22 +306,4 @@ class UnlockFocus(PSRECCameraButton):
 	def go(self):
 		self.sdkCamera.unlockFocus()
 
-class StartViewfinder(PSRECCameraButton):
-	propertyId = '_START_VIEWFINDER'
-	name = 'Start viewfinder'
-	section = 'General'
-	controlType = interface.ControlType.Button
-	def go(self):
-		self.camera.startViewfinder()
-
-		
-class StopViewfinder(PSRECCameraButton):
-	propertyId = '_STOP_VIEWFINDER'
-	name = 'Stop viewfinder'
-	section = 'General'
-	controlType = interface.ControlType.Button
-	def go(self):
-		self.camera.stopViewfinder()
-		
-
-API.propertyClasses = [Zoom,ISO,ExposureMode,Aperture,ShutterSpeed,FocusPoint,WhiteBalance,CameraOutput,CameraModel,ResetAEAFAWB,LockFocus,UnlockFocus,StartViewfinder,StopViewfinder]
+API.propertyClasses = [Zoom,ISO,ExposureMode,Aperture,ShutterSpeed,FocusPoint,WhiteBalance,CameraOutput,CameraModel,ResetAEAFAWB,LockFocus,UnlockFocus]

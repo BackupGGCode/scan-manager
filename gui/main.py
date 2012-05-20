@@ -1,6 +1,6 @@
 from .common import *
 from . import shooting
-from . import settings
+from . import setup
 from gui.dialogs import CrashDialog
 import backend
 import base
@@ -13,32 +13,57 @@ import Queue
 
 
 class ApplicationSettings(object):
+	
 	def __contains__(self,k):
 		return k in self.__dict__
+	
+	def __getitem__(self,k):
+		return self.__dict__[k]
+	
+	def __setitem__(self,k,v):
+		self.__dict__[k] = v
+	
 	def get(self,*args):
 		return self.__dict__.get(*args)
 
 
 class ApplicationMainSettings(object):
+	
+	_children = ['setup']
+	
 	def __init__(self,db):
-		self._db = db
-	def __getattr__(self,k):
-		self.__dict__[k] = ApplicationSettings()
-		return self.__dict__[k]
+		self.__dict__['_db'] = db
+		
+	def __hasattr__(self,k):
+		return k in self.__dict__
+	
+	def __setattr__(self,k,v):
+		if k not in self._children:
+			raise AttributeError(k)
+		self.__dict__[k] = v
+	
 	def save(self):
-		for k in self.__dict__:
+		for k,v in self.__dict__.items():
 			if k == '_db':
 				continue
 			try:
-				self._db[k] = getattr(self,k)
+				self._db[k] = v
 			except:
 				log.error('error saving %s in settings db'%k)
+		self._db.sync()
+				
 	def load(self):
 		if self._db.get('version',None) != base.smGetSettingsVersion():
 			return False
 		for k,v in self._db.items():
+			if k not in self._children:
+				continue
 			setattr(self,k,v)
+		for k in self._children:
+			if k not in self:
+				setattr(self,k,ApplicationSettings())
 		return True
+	
 	def __contains__(self,k):
 		return k in self.__dict__
 		
@@ -67,16 +92,11 @@ class App(Application):
 				self.quit()
 				return
 			
-		if 'calibrators' not in self.settings:
-			self.settings.calibrators = {1:None,2:None}
-		if 'rotate' not in self.settings:
-			self.settings.rotate = {1:None,2:None}
-		
 		self.images = []
 		
 		backend.apis = backend.BackendManager(trace=base.runtimeOptions.trace)
 		apis = backend.apis
-		apis.loadAll()		
+		apis.loadAll()
 		apis.openAll(db=self.db)
 		errorText = apis.formatAPIErrors()
 		if errorText:
@@ -91,7 +111,7 @@ class App(Application):
 		self.SetupWindow.loadSettings()
 	
 		
-	class SetupWindow(settings.SetupWindow):
+	class SetupWindow(setup.SetupWindow):
 		pass
 	
 	
@@ -109,12 +129,25 @@ class App(Application):
 	def cameras(self):
 		if not hasattr(self,'settings'):
 			return ()
-		if self.settings.setup.mode == Mode.V:
+		if self.setup.mode == Mode.V:
 			return (self.setup.cameraL,self.setup.cameraR)
 		else:
 			return (self.setup.cameraC,)
 
+	def cameraSetting(self,camera):
+		if type(camera) is int:
+			camera = self.cameras[camera]
+			
+		name = 'CameraSetting:%s'%camera.getName()
+		
+		if name not in self.settings.cameras:
+			self.settings.cameras[name] = ApplicationSettings()
+			
+		return self.settings.cameras[name]
+		
+
 	calibrationDataChanged = QtCore.Signal()
 	cropboxChanged = QtCore.Signal(object,object)
+
 
 

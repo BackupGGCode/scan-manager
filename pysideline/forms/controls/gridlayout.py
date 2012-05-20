@@ -33,19 +33,19 @@ class _GridLayout(base._AbstractGroup):
 		
 		for field in self._children.values():
 			row = field.row
-			if row is NOTSET:
+			if row == NOTSET:
 				row = self._qt.Layout.rowCount()
 			col = field.col
-			if col is NOTSET:
+			if col == NOTSET:
 				col = self._qt.Layout.colCount()
 			rowSpan = field.rowSpan
-			if rowSpan is NOTSET:
+			if rowSpan == NOTSET:
 				rowSpan = 1
 			colSpan = field.colSpan
-			if colSpan is NOTSET:
+			if colSpan == NOTSET:
 				colSpan = 1
 			cellAlignment = field.cellAlignment
-			if cellAlignment is NOTSET:
+			if cellAlignment == NOTSET:
 				cellAlignment = 0
 				
 			self._qt.Layout.addWidget(

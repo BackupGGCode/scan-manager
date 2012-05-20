@@ -32,7 +32,7 @@ class _CheckBox(BaseWidgetField):
 	
 		
 	def setRawValue(self,v):
-		if v is NOTSET:
+		if v == NOTSET:
 			self.clear()
 			
 		if v is True:
@@ -43,11 +43,11 @@ class _CheckBox(BaseWidgetField):
 			v = Qt.PartiallyChecked
 		else:
 			raise Exception('Invalid value for a checkbox %r (must be True, False or None)'%v)
-		self._qt.setCheckedState(v)
+		self._qt.setCheckState(v)
 
 
 	def clear(self):
-		self._qt.setCheckedState(Qt.Unchecked)
+		self._qt.setCheckState(Qt.Unchecked)
 
 class CheckBox(Factory):
 	klass = _CheckBox

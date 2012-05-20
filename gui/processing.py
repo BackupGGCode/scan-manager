@@ -35,7 +35,9 @@ class PostCaptureJob(ProcessingJob):
 		
 	def execute(self):
 		
-		if not (self.app.settings.calibrators[self.cameraIndex] and self.app.settings.calibrators[self.cameraIndex].isActive()) and not (self.app.settings.crop.get('enabled',False)):
+		camera = self.app.cameras[self.cameraIndex]
+		
+		if not (camera.settings.get('undistort',None) and camera.settings.undistort.isActive()) and not (camera.settings.crop.get('enabled',False)):
 			# neither correction nor cropping configured so do not save a processed version
 			return
 
@@ -44,13 +46,13 @@ class PostCaptureJob(ProcessingJob):
 			self.pm.load(self.image[self.cameraIndex].raw.getFilePath())
 		
 		# calibration correction
-		if self.app.settings.calibrators[self.cameraIndex] and self.app.settings.calibrators[self.cameraIndex].isActive():
-			self.pm = self.app.settings.calibrators[self.cameraIndex].correct(self.pm)
+		if camera.settings.get('undistort',None) and camera.settings.undistort.isActive():
+			self.pm = camera.settings.undistort.correct(self.pm)
 
 		# cropping
-		if self.app.settings.crop.get('enabled',False):
+		if camera.settings.undistort.crop.get('enabled',False):
 			qi = self.pm.toImage()
-			c = self.app.settings.crop.coords[self.cameraIndex]
+			c = camera.settings.undistort.crop.coords
 			size = qi.size()
 			qi = qi.copy(c[0],c[1],max(size.width()-c[2],c[0]+1),max(size.height()-c[3],c[1]+1))
 			self.pm = QtGui.QPixmap.fromImage(qi)

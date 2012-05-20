@@ -86,7 +86,7 @@ class ScriptMessage(object):
 	
 	@property
 	def value(self):
-		if self.type == ScriptMessageType.USER:
+		if self.type == ScriptMessageType.USER or self.type == ScriptMessageType.RET:
 			if self.subType == ScriptMessageSubType.INTEGER:
 				return struct.unpack('i',self.data)[0]
 			elif self.subType == ScriptMessageSubType.BOOLEAN:
@@ -98,7 +98,7 @@ class ScriptMessage(object):
 			elif self.subType == ScriptMessageSubType.TABLE:
 				return {k:v for k,v in [tuple(i.split('\t')) for i in self.data.split('\n')[:-1]]}
 			elif self.subType == ScriptMessageSubType.UNSUPPORTED:
-				raise Exception('Unsupported LUA type sent as a script message')
+				raise Exception('Unsupported LUA type sent as a script message (data=%r)'%self.data)
 		else:
 			return self.data
 

@@ -2,15 +2,16 @@ from .common import *
 from .thumbnails import ThumbnailView
 from .imagemanager import CapturedImageManager
 from .dialogs import ProgressDialog
+from . import configuration
 from . import imageviewer
 from . import processing
 from .cameraui import CameraControls
 import log
+import backend
 
 import threading
 import Queue
 import time
-
 
 
 class CaptureThread(threading.Thread):
@@ -116,7 +117,10 @@ class MainWindow(BaseWidget,QtGui.QMainWindow):
 		self.setCorner(Qt.TopRightCorner,Qt.RightDockWidgetArea)
 		self.setCorner(Qt.BottomRightCorner,Qt.RightDockWidgetArea)
 		
-		self.viewMenu = self.menuBar().addMenu('&View')
+		self.viewMenu = self.menuBar().addMenu('&File')
+		self.actAbout = self.viewMenu.addAction(
+			QtGui.QAction('&Configuration',self,triggered=self.doConfiguration,checkable=False)
+		)
 		self.actAbout = self.viewMenu.addAction(
 			QtGui.QAction('&About',self,triggered=self.doAbout,checkable=False)
 		)
@@ -124,7 +128,6 @@ class MainWindow(BaseWidget,QtGui.QMainWindow):
 		self.captureShortcut = QtGui.QShortcut(QtGui.QKeySequence("Ctrl+P"),self) 
 		self.captureShortcut.setContext(Qt.ApplicationShortcut)
 		self.captureShortcut.activated.connect(self.doCapture)
-
 		
 	def doCapture(self):
 		self.startCaptureThreads()
@@ -185,8 +188,8 @@ class MainWindow(BaseWidget,QtGui.QMainWindow):
 		# start per-camera viewfinder threads
 		self.app.captureThreads = {}
 		self.startCaptureThreads()
-
-
+		
+		
 	def startCaptureThreads(self):
 		""" start the per-camera capture threads as needed """
 		for camera in self.app.cameras:
@@ -322,6 +325,15 @@ class MainWindow(BaseWidget,QtGui.QMainWindow):
 				def onclicked(self):
 					self.app.MainWindow.doCapture()
 
+			class ConfigureButton(BaseWidget,QtGui.QPushButton):
+				def init(self):
+					self._up.Layout.addWidget(self)
+					self.setText(self.tr('Configure'))
+					#self.setIcon(QtGui.QIcon(':/camera-24.png'))
+					#self.setIconSize(QtCore.QSize(24,24))
+					
+				def onclicked(self):
+					self.app.MainWindow.doConfiguration()
 			
 	class ThumbnailDock(BaseWidget,QtGui.QDockWidget):
 		def init(self):
@@ -342,13 +354,18 @@ class MainWindow(BaseWidget,QtGui.QMainWindow):
 	def doAbout(self):
 		QtGui.QMessageBox.about(self,'About scan manager',
 			"""
-			<p>The <b>scan manager</b> automates the use of USB-tethered cameras with book scanners
+			<p><b>Scan Manager v%s</b></p>
+			<p>Scan Manager automates the use of USB-tethered cameras with book scanners
 			(see <a href="http://www.diybookscanner.org">www.diybookscanner.org<a>)</p>
 			<p>This software and its associated source code is provided for free under the LGPL v3.0 license (full text <a href="http://www.gnu.org/copyleft/lesser.html">here</a>)</p> 
 			<p>The libgphoto2 backend is currently GPL rather than LGPL because of its dependency on Cygwin</a></p> 
 			<p>For more information please contact Oren Goldschmidt at <a href="mailto:og200@hotmail.com">og200@hotmail.com</a></p> 
-			"""
+			"""%smGetVersion()
 		)
+		
+	def doConfiguration(self):
+		dialog = configuration.ConfigurationDialog(parent=self)
+		dialog.open()
 		
 	#
 	# Shooting window methods
@@ -370,7 +387,7 @@ class MainWindow(BaseWidget,QtGui.QMainWindow):
 		pm.loadFromData(event.data)
 		
 		# rotation for preview only
-		angle = self.app.settings.rotate[cameraIndex]
+		angle = event.camera.settings.rotate[cameraIndex]
 		if angle:
 			transform = QtGui.QTransform()
 			transform.rotate(angle)
@@ -402,15 +419,14 @@ class MainWindow(BaseWidget,QtGui.QMainWindow):
 			viewfinder.show()
 			
 		# rotation
-		angle = self.app.settings.rotate[cameraIndex]
-		if angle:
+		if 'rotate' in event.camera.settings and event.camera.settings.rotate:
 			transform = QtGui.QTransform()
-			transform.rotate(angle)
+			transform.rotate(event.camera.settings.rotate)
 			pm = pm.transformed(transform)
 			
 		# correction
-		#if self.app.settings.calibrators[cameraIndex] and self.app.settings.calibrators[cameraIndex].isActive():
-		#	pm = self.app.settings.calibrators[cameraIndex].correct(pm)
+		#if event.camera.settings.get('undistort',None) and event.camera.settings.isActive():
+		#	pm = event.camera.settings.correct(pm)
 			
 		viewfinder.loadFromData(pm)
 

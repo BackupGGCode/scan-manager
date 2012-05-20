@@ -84,6 +84,7 @@ class BackendManager(object):
 	
 	def __init__(self,trace=True):
 		self.states = []
+		self.statesByName = {}
 		self.trace = trace
 
 		
@@ -97,14 +98,17 @@ class BackendManager(object):
 			info = importlib.import_module('.%s'%backend,name).Info
 			available = info.isAvailable()
 			if not available:
-				self.states.append(BackendState(info=info,state=APIState.NotSupported))
-				continue
-			try:
-				module = importlib.import_module('.%s.wrapper'%backend,name)
-			except:
-				self.states.append(BackendState(info=info,state=APIState.ImportError,error=self.formatException()))
+				state = BackendState(info=info,state=APIState.NotSupported)
 			else:
-				self.states.append(BackendState(info=info,state=APIState.Imported,module=module))
+				try:
+					module = importlib.import_module('.%s.wrapper'%backend,name)
+				except:
+					state = BackendState(info=info,state=APIState.ImportError,error=self.formatException())
+				else:
+					state = BackendState(info=info,state=APIState.Imported,module=module)
+			
+			self.states.append(state)
+			self.statesByName[backend] = state
 
 			
 	def openAll(self,db):
@@ -160,6 +164,25 @@ class BackendManager(object):
 			if i.state != APIState.Opened:
 				continue
 			yield i.api
-			
+
+
+	def __getitem__(self,moduleName):
+		"""
+		Returns the api for the named backend module if it has been opened
+		"""
+		state = self.statesByName[moduleName]
+		if state.state != APIState.Opened:
+			return None
+		else:
+			return state.api
+		
+	
+	def __contains__(self,moduleName):
+		"""
+		Returns true if the named backend module is loaded and opened
+		"""
+		return moduleName in self.statesByName and self.statesByName[moduleName].state == APIState.Opened
+
+
 			
 apis = None 

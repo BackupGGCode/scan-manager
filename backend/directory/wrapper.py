@@ -36,8 +36,8 @@ class API(interface.API):
 	def open(self):
 		if self.opened:
 			return
-		Camera1 = Camera(self,'Directory-scanner dummy camera 1')
-		Camera2 = Camera(self,'Directory-scanner dummy camera 2')
+		Camera1 = Camera(self,'Directory-scanner 1')
+		Camera2 = Camera(self,'Directory-scanner 2')
 		self.cameras = [Camera1,Camera2]
 	
 

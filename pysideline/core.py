@@ -46,13 +46,15 @@ class Acquisition(object):
 	def __getattr__(self,k):
 		o = self.base
 		while 1:
-			if hasattr(self.base,k):
-				return getattr(self.base,k)
+			if hasattr(o,k):
+				return getattr(o,k)
 			if hasattr(o,'_up') and o._up is not None:
 				o = o._up
 			else:
-				ei = sys.exc_info()
-				raise ei[0],None,ei[2].tb_next 
+				raise AttributeError(k)
+				#ei = sys.exc_info()
+				#if ei[2]:
+				#	raise ei[0],None,ei[2].tb_next
 
 
 
