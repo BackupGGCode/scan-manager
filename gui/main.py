@@ -6,6 +6,7 @@ import backend
 import base
 import log
 import os
+import shutil
 from . import processing
 
 import shelve
@@ -72,7 +73,21 @@ class ApplicationMainSettings(object):
 class App(Application):
 
 	def init(self):
-		self.db = shelve.open(os.path.join(smDataPath(),'scanmanager.settings'))
+		
+		dbFile = os.path.join(smDataPath(),'scanmanager.settings')
+		
+		if not os.path.exists(dbFile):
+			shutil.copyfile(os.path.join(smBasePath(),'scanmanager.settings.default'),dbFile)
+		
+		# open a db and check we can access its keys
+		db = shelve.open(dbFile)
+		[i for i in db.keys()]
+		db.close()
+		
+		# db seems OK -- make a backup and then open it for real
+		shutil.copyfile(dbFile,os.path.join(smDataPath(),'scanmanager.settings.backup'))
+		self.db = shelve.open(dbFile)
+		
 		if not self.db.keys():
 			self.db['version'] = base.smGetSettingsVersion()
 		self.settings = ApplicationMainSettings(db=self.db)

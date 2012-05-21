@@ -5,7 +5,7 @@ import PtpValues
 import struct
 
 
-class PtpUnpacker:
+class PtpUnpacker(object):
 	
 	def __init__(self, raw):
 		self.raw = raw
@@ -92,7 +92,7 @@ class PtpUnpacker:
 				return self.unpack_array(fmt)
 
 
-class PtpPacker:
+class PtpPacker(object):
 	
 	def __init__(self):
 		self.raw = ""
@@ -161,7 +161,7 @@ class PtpPacker:
 
 
 
-class PtpDeviceInfo:
+class PtpDeviceInfo(object):
 	
 	def __init__(self, raw):
 		unpacker = PtpUnpacker(raw)
@@ -180,7 +180,7 @@ class PtpDeviceInfo:
 		self.SerialNumber = unpacker.unpack_string()		
 
 
-class PtpStorageInfo:
+class PtpStorageInfo(object):
 	
 	def __init__(self, raw):
 		unpacker = PtpUnpacker(raw)
@@ -191,7 +191,7 @@ class PtpStorageInfo:
 
 
 
-class PtpObjectInfo:
+class PtpObjectInfo(object):
 	
 	def __init__(self, raw):
 		unpacker = PtpUnpacker(raw)
@@ -206,7 +206,7 @@ class PtpObjectInfo:
 		self.Keywords = unpacker.unpack_string()
 
 
-class PtpDevicePropertyInfo:
+class PtpDevicePropertyInfo(object):
 	
 	def __init__(self, raw):
 		unpacker = PtpUnpacker(raw)
@@ -234,7 +234,7 @@ class PtpDevicePropertyInfo:
 				count-=1
  
 
-class PtpSession:
+class PtpSession(object):
 	"Class implementing a session over an underlying PTP transport"
 	
 	def __init__(self, transport):

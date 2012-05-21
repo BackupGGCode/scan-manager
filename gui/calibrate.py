@@ -22,7 +22,7 @@ class CalibrateDialog(BaseDialog,QtGui.QDialog):
 		
 		self.camera = camera
 
-		c = self.camera.settings.calibrators
+		c = self.camera.settings.get('undistort',None)
 		if not hasattr(c,'realSizeMM') or not hasattr(c,'chessboardSize'):
 			# this can happen with some calibration failures
 			c = None
@@ -36,7 +36,7 @@ class CalibrateDialog(BaseDialog,QtGui.QDialog):
 			self.realSizeMM=[169.0,254.0]
 			self.chessboardSize=[17,25]
 			
-		self.camera.calibrators = self.calibrator
+		self.camera.settings.undistort = self.calibrator
 			
 		self.Viewers.CalibrateBefore.loadFromData(pm)
 		self.original = pm
@@ -66,7 +66,7 @@ class CalibrateDialog(BaseDialog,QtGui.QDialog):
 		self.close()
 		
 	def doClear(self):
-		self.camera.settings.calibrators = None
+		self.camera.settings.undistort = None
 		self.app.calibrationDataChanged.emit()
 		self.close()
 		

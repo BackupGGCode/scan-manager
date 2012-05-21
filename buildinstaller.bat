@@ -1,5 +1,7 @@
 set PYTHON_ROOT="d:\python27"
 del /S /Q dist
+%PYTHON_ROOT%\python extractdefaultsettings.py
+pause
 cd resources
 %PYTHON_ROOT%\lib\site-packages\PySide\pyside-rcc.exe -o ..\resources.py scanmanager.qrc
 pause

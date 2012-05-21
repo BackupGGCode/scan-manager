@@ -116,7 +116,7 @@ class API(object):
 	
 	def loadSettings(self):
 		""" Load persistent settings from the app's settings db """
-		key = 'APISettings:%s'%(self.getName())
+		key = 'APISettings:%s'%(self.getId())
 		if key in self.db:
 			self._settings = self.db[key]
 		else:
@@ -125,12 +125,13 @@ class API(object):
 
 	def saveSettings(self):
 		""" Save persistent settings from the app's settings db """
-		for camera in self.getCameras():
-			if camera.opened:
-				camera.saveSettings()
+		if self.opened:
+			for camera in self.getCameras():
+				if camera.opened:
+					camera.saveSettings()
 		if not getattr(self,'_settings',None):
 			return
-		key = 'APISettings:%s'%(self.getName())
+		key = 'APISettings:%s'%(self.getId())
 		self.db[key] = self._settings
 
 

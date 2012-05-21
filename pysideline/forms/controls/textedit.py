@@ -19,6 +19,8 @@ class _TextEdit(BaseWidgetField):
 		QtProperty(name='lineWrapMode',options=[QtGui.QTextEdit.NoWrap,QtGui.QTextEdit.WidgetWidth,QtGui.QTextEdit.FixedPixelWidth,QtGui.QTextEdit.FixedColumnWidth]),
 		QtProperty(name='overwriteMode',type=bool),
 		QtProperty(name='readOnly',type=bool,getter='isReadOnly'),
+		QtProperty(name='tabStopWidth',type=int),
+		QtProperty(name='tabChangesFocus',type=bool),
 		QtProperty(name='textInteractionFlags',flags=[
 			Qt.NoTextInteraction,Qt.TextSelectableByMouse,Qt.TextSelectableByKeyboard,Qt.LinksAccessibleByMouse,Qt.LinksAccessibleByKeyboard,Qt.TextEditable,
 			Qt.TextEditorInteraction,Qt.TextBrowserInteraction]

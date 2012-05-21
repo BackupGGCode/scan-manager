@@ -11,6 +11,8 @@ if platform.system().lower() == 'windows':
 		version = base.smGetVersion(),
 		description = "Tethered shooting GUI for book scanners",
 		data_files = [
+			# Default settings
+			('',['scanmanager.settings.default']),
 			# Canon PS-ReC dlls
 			('backend/canonpsrec',['backend/canonpsrec/PRLIB.dll','backend/canonpsrec/PRSDK.dll']),
 			# Nikon DLLs and plugins

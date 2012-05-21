@@ -63,6 +63,12 @@ class FormData(object):
 				s += indent + '  %s=%r %s\n'%(k,v,error)
 		return s
 	
+	def __eq__(self,other):
+		if isinstance(other,FormData):
+			return self._data == other._data and self._errors == other._errors
+		else:
+			return False
+	
 	def _items(self):
 		return self._data.items()
 
@@ -958,7 +964,10 @@ class _AbstractGroup(BaseWidgetField):
 		hasErrors = False
 		
 		for field in self._children.values():
-			if field.hidden:
+			if hasattr(field,'enabled'):
+				if not field.enabled:
+					continue
+			elif field.hidden:
 				continue
 			error,value = field.getValueAndError(mark=mark)
 			if value == NOTSTORED:
@@ -988,7 +997,8 @@ class _AbstractGroup(BaseWidgetField):
 			raise Exception('Cannot set value for group (%s) unless groupData is True'%self.name)
 		
 		for k,v in v._items():
-			self.getField(k).setValue(v)
+			if k in self._fields:
+				self.getField(k).setValue(v)
 
 
 	def clear(self):

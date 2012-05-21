@@ -5,6 +5,7 @@ import PtpValues
 
 import ctypes
 import struct
+import threading
 
 import chdkimage
 
@@ -104,68 +105,75 @@ class ScriptMessage(object):
 
 
 class PtpCHDKSession(PtpSession):
+	
+	def __init__(self,*args,**kargs):
+		super(PtpCHDKSession,self).__init__(*args,**kargs)
+		self.lock = threading.Lock()
 
 	
 	def chdkRequest(self,params):
-		if type(params) is int:
-			params = (params,)
+		with self.lock:
+			if type(params) is int:
+				params = (params,)
+				
+			request = PtpRequest(PTP_OC_CHDK, self.sessionid, self.NewTransaction(), params)
 			
-		request = PtpRequest(PTP_OC_CHDK, self.sessionid, self.NewTransaction(), params)
-		
-		self.transport.send_ptp_request(request)
-		response = self.transport.get_ptp_response(request)
-		if response.respcode != PtpValues.StandardResponses.OK:
-			raise PtpException(response.respcode)
-		return response
+			self.transport.send_ptp_request(request)
+			response = self.transport.get_ptp_response(request)
+			if response.respcode != PtpValues.StandardResponses.OK:
+				raise PtpException(response.respcode)
+			return response
 	
 
 	def chdkRequestWithSend(self,params,fmt=None,args=None,buffer=None):
-		if type(params) is int:
-			params = (params,)
+		with self.lock:
+			if type(params) is int:
+				params = (params,)
+				
+			request = PtpRequest(PTP_OC_CHDK, self.sessionid, self.NewTransaction(), params)
 			
-		request = PtpRequest(PTP_OC_CHDK, self.sessionid, self.NewTransaction(), params)
-		
-		if fmt:
-			assert args
-			packer = PtpPacker()
-			packer.pack(fmt,*args)
-			tx_data = packer.raw
-			if buffer:
-				tx_data += buffer
-		elif buffer:
-			tx_data = buffer
-		else:
-			tx_data = None
-
-		self.transport.send_ptp_request(request)
-		self.transport.send_ptp_data(request, tx_data)
-		response = self.transport.get_ptp_response(request)
-		if response.respcode != PtpValues.StandardResponses.OK:
-			raise PtpException(response.respcode)
-		return response
+			if fmt:
+				assert args
+				packer = PtpPacker()
+				packer.pack(fmt,*args)
+				tx_data = packer.raw
+				if buffer:
+					tx_data += buffer
+			elif buffer:
+				tx_data = buffer
+			else:
+				tx_data = None
+	
+			self.transport.send_ptp_request(request)
+			self.transport.send_ptp_data(request, tx_data)
+			response = self.transport.get_ptp_response(request)
+			if response.respcode != PtpValues.StandardResponses.OK:
+				raise PtpException(response.respcode)
+			return response
 
 
 	def chdkRequestWithReceive(self,params,stream=None):
-		if type(params) is int:
-			params = (params,)
+		with self.lock:
+			if type(params) is int:
+				params = (params,)
+				
+			request = PtpRequest(PTP_OC_CHDK, self.sessionid, self.NewTransaction(), params)
 			
-		request = PtpRequest(PTP_OC_CHDK, self.sessionid, self.NewTransaction(), params)
-		
-		# send the tx
-		rx_data = None
-		response = None
-		
-		self.transport.send_ptp_request(request)
-		if stream:
-			self.transport.get_ptp_data(request,stream)
-		else:
-			data = self.transport.get_ptp_data(request)
-		response = self.transport.get_ptp_response(request)
-		if response.respcode != PtpValues.StandardResponses.OK:
-			raise PtpException(response.respcode)
-		if not stream:
-			response.data = data
-		return response
+			# send the tx
+			rx_data = None
+			response = None
+			
+			self.transport.send_ptp_request(request)
+			if stream:
+				self.transport.get_ptp_data(request,stream)
+			else:
+				data = self.transport.get_ptp_data(request)
+			response = self.transport.get_ptp_response(request)
+			if response.respcode != PtpValues.StandardResponses.OK:
+				raise PtpException(response.respcode)
+			if not stream:
+				response.data = data
+			return response
 	
 	
 	def GetMemory(self,start,num):
@@ -199,7 +207,7 @@ class PtpCHDKSession(PtpSession):
 			stream = stream
 		)
 		if stream is None:
-			return response.data
+			return response.data[1]
 
 	def ExecuteScript(self,script):
 		response = self.chdkRequestWithSend((Operation.ExecuteScript,ScriptLanguage.LUA,0),buffer=script+'\x00')

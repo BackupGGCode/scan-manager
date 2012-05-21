@@ -197,9 +197,10 @@ class PtpUsbTransport(PtpAbstractTransport.PtpAbstractTransport):
         return rc.tostring()
 
     def __hexdump(self, data):
-        print
+        out = ''
         for b in data:
-            print hex(ord(b))
+            out += hex(ord(b))
+        return out
 
     @classmethod
     def findptps(cls):

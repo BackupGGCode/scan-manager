@@ -9,6 +9,8 @@ import backend.chdk.wrapper
 from pysideline.forms import *
 from pysideline.treemodel import TreeModel,TreeItem
 
+import cPickle
+
 import base
 import log
 import copy
@@ -31,12 +33,12 @@ CameraSettings = Form(name='cameraSettings',contents=[
 	'''),
 	TableView(name='cameraControls',tableActions=TableAction.All,formPosition=FormPosition.Bottom,
 		editForm=Form(name='cameraControlsForm',contentsMargins=QtCore.QMargins(0,11,0,11),contents=[
-			ComboBox(name='control',label='Control:',options=optCameraControls,required=True),
-			LineEdit(name='tab',label='Tab:',type=str,required=True),
+			ComboBox(name='ident',label='Control:',options=optCameraControls),
+			LineEdit(name='section',label='Tab:',type=str),
 		]),
 		columns=[
-			Column(name='control',label='Control',resizeMode=QtGui.QHeaderView.Stretch),
-			Column(name='tab',label='Tab',resizeMode=QtGui.QHeaderView.Stretch),
+			Column(name='ident',label='Control',resizeMode=QtGui.QHeaderView.Stretch),
+			Column(name='section',label='Tab',resizeMode=QtGui.QHeaderView.Stretch),
 		],
 	),
 	Label(name='l3',wordWrap=True,text='''
@@ -50,7 +52,7 @@ CameraSettings = Form(name='cameraSettings',contents=[
 	'''),
 	TableView(name='savedProperties',tableActions=TableAction.All,formPosition=FormPosition.Bottom,
 		editForm=Form(name='cameraControlsForm',contentsMargins=QtCore.QMargins(0,11,0,11),contents=[
-			ComboBox(name='control',label='Control:',options=optCameraControls,required=True),
+			ComboBox(name='control',label='Control:',options=optCameraControls),
 		]),
 		columns=[
 			Column(name='control',label='Control',resizeMode=QtGui.QHeaderView.Stretch),
@@ -71,15 +73,32 @@ def Script(name,label,fixedHelp='',luaHelp='',hideFixed=False,**kargs):
 		ComboBox(name='%sScriptType'%name,label='Script type:',options=opts),
 		Label(name='%sLuaHelp'%name,wordWrap=True,text='<p>%s</p>'%luaHelp,
 				hidden=lambda f:getattr(f,'%sScriptType'%name).getValue() != 'lua',depends='%sScriptType'%name),
-		TextEdit(name='%sScript'%name,label='Script:',type=str,font=QtGui.QFont('Courier New'),wordWrapMode=QtGui.QTextOption.NoWrap,
+		TextEdit(name='%sScript'%name,label='Script:',type=str,font=QtGui.QFont('Courier New'),wordWrapMode=QtGui.QTextOption.NoWrap,tabStopWidth=40,
 				hidden=lambda f:getattr(f,'%sScriptType'%name).getValue() != 'lua',depends='%sScriptType'%name),
-		LineEdit(name='%sFixedValue'%name,label='Fixed value:',type=str,required=True,
+		TextEdit(name='%sFixedValue'%name,label='Fixed value:',type=str,font=QtGui.QFont('Courier New'),wordWrapMode=QtGui.QTextOption.NoWrap,tabStopWidth=40,
 				hidden=lambda f:getattr(f,'%sScriptType'%name).getValue() != 'fixed',depends='%sScriptType'%name),
 	],**kargs)
 
 CT = backend.interface.ControlType
 
 CHDKSettings = TabbedForm(name='chdkSettings',documentMode=True,contents=[
+	Tab(name='t2',label='Basic Settings',contents=[
+		ComboBox(name='downloadMode',label='Image download mode:',options=[
+			('Download in the background','background'),
+			('Download later (do not download images)  (RECOMMENDED)','later'),
+		]),
+		Label(name='t2_l1',wordWrap=True,text='''
+			<hr/>
+			<p>This script is used in the background to look for new files. It should include the string <i>##LASTTIME##</i> which will
+			be replaced with the integer value of the last time the script was run and found some files to download. 
+			It must return a LUA table of the form 
+			<pre>{0='A/DCIM/file1',1='A/DCIM/file2',started=START_TIME}</pre> 
+			where START_TIME is the	time the search for new files was started.</p>
+		'''),
+		TextEdit(name='listNewFilesScript',type=str,
+				font=QtGui.QFont('Courier New'),wordWrapMode=QtGui.QTextOption.NoWrap,tabStopWidth=40,
+		),
+	]),
 	ScrollTab(name='t1',label='Camera Controls',contents=[
 		Label(name='t1_l1',wordWrap=True,text='''
 			<p>You must create one control with the name "capture" which returns a value of 
@@ -88,10 +107,10 @@ CHDKSettings = TabbedForm(name='chdkSettings',documentMode=True,contents=[
 		TableView(name='chdkControls',tableActions=TableAction.All,formPosition=FormPosition.Bottom,
 			editForm=TabbedForm(name='chdkControlsForm',documentMode=True,contents=[
 				Tab(name='t1_1',label='Basic settings',contents=[
-					LineEdit(name='name',label='Name (short name):',type=str,required=True),
-					LineEdit(name='label',label='Label (full name):',type=str,required=True),
-					LineEdit(name='tab',label='Tab:',type=str,required=True),
-					ComboBox(name='controlType',label='Control type:',required=True,options=[
+					LineEdit(name='name',label='Name (short name):',type=str),
+					LineEdit(name='label',label='Label (full name):',type=str),
+					LineEdit(name='tab',label='Tab:',type=str),
+					ComboBox(name='controlType',label='Control type:',options=[
 						('Button',CT.Button),
 						('Checkbox',CT.Checkbox),
 						('Combo box',CT.Combo),
@@ -109,7 +128,7 @@ CHDKSettings = TabbedForm(name='chdkSettings',documentMode=True,contents=[
 				Script(name='options',label='Options',
 					depends='controlType',enabled=lambda f:f.controlType.getValue() in [CT.Combo],
 					luaHelp='The LUA script should return an array table of strings',
-					fixedHelp='Enter options separated by commas.',
+					fixedHelp='Enter all possible options for this combo, one option per line.',
 				),
 				Script(name='range',label='Range',
 					depends='controlType',enabled=lambda f:f.controlType.getValue() in [CT.Slider],
@@ -138,13 +157,6 @@ CHDKSettings = TabbedForm(name='chdkSettings',documentMode=True,contents=[
 			],
 		),
 	]),
-	Tab(name='t2',label='Base Script',contents=[
-		ComboBox(name='baseScriptMode',label='Operating mode:',options=[
-			('Initialisation/function script','init'),
-			('Persistently running handler script','handler'),
-		]),
-		TextEdit(name='baseScript'),
-	]),
 ])
 
 
@@ -155,12 +167,16 @@ class ConfigurationDialog(BaseDialog,QtGui.QDialog):
 		self.setModal(True)
 		self.resize(1000,740)
 		
+		self.initialDataByForm = {}
+		
 		for form in self.cameraForms:
 			if form.camera.settings.get('config',None):
 				form.setValue(form.camera.settings.config)
+			self.initialDataByForm[form.name] = form.getValue()
 				
 		if self.chdkAPI and self.chdkAPI.settings.get('config',None):
 			self.chdkForm.setValue(self.chdkAPI.settings.config)
+		self.initialDataByForm[self.chdkForm.name] = self.chdkForm.getValue()
 		
 	@property
 	def chdkAPI(self):
@@ -224,6 +240,7 @@ class ConfigurationDialog(BaseDialog,QtGui.QDialog):
 			
 			def init(self):
 				self.Form = None
+				self.form = None
 			
 			class Layout(BaseLayout,QtGui.QVBoxLayout):
 				def init(self):
@@ -236,11 +253,13 @@ class ConfigurationDialog(BaseDialog,QtGui.QDialog):
 					self.Layout.removeWidget(self.Form)
 					self.Form.hide()
 					self.Form = None
+					self.form = None
 
 				item = self._up.Tree.model().getItem(current)
 
 				if item:					
 					form = getattr(item,'form',None)
+					self.form = form
 					if form:
 						self.Form = item.Form
 						self.Form.show()
@@ -268,45 +287,134 @@ class ConfigurationDialog(BaseDialog,QtGui.QDialog):
 				self.setText(self.tr('&Save'))
 				
 			def onclicked(self):
+				
 				dialog = self._up._up
 				
-				dataByForm = {}
-				errorString = ''
-				for form in dialog.cameraForms + [dialog.chdkForm]:
-					if form is None:
-						continue
-					if not getattr(form,'_qt',None):
-						continue
-					error,data = form.getValueAndError()
-					dataByForm[form] = data
-					if error:
-						for k,v in data._errors.items():
-							field = getattr(self._up._up.form,k)
-							### TODO: add name of form/camera to error messages
-							if v is True:
-								errorString += '%s is invalid\n'%(field.label)
-							else:
-								errorString += '%s %s\n'%(field.label or field.name,v)
-								
+				errorString,dataByForm = dialog.getDataForAll()
+
 				if errorString:
 					QtGui.QMessageBox.critical(self,'Errors',errorString)
 					return
 				
+				dialog.initialDataByForm = dataByForm
+				
 				for form in dialog.cameraForms:
-					form.camera.settings.config = dataByForm[form]
-					
+					form.camera.settings.config = dataByForm[form.name]
+					form.camera.api.saveSettings()
+			
 				if dialog.chdkForm:
-					dialog.chdkAPI.settings.config = dataByForm[dialog.chdkForm]
+					dialog.chdkAPI.settings.config = dataByForm[dialog.chdkForm.name]
+					dialog.chdkAPI.saveSettings()
 					
-				dialog.chdkAPI.saveSettings()
-				
-				dialog.close()
-				
-		class CancelButton(BaseWidget,QtGui.QPushButton):
+								
+		class CloseButton(BaseWidget,QtGui.QPushButton):
 			def init(self):
 				self._up.Layout.addWidget(self)
-				self.setText(self.tr('&Cancel'))
+				self.setText(self.tr('&Close'))
 				
 			def onclicked(self):
-				self._up._up.close()
+				dialog = self._up._up
+				dialog.close()
 				
+
+		class ExportButton(BaseWidget,QtGui.QPushButton):
+			def init(self):
+				self._up.Layout.addWidget(self)
+				self.setText(self.tr('&Export settings (selected category)'))
+				
+			def onclicked(self):
+				dialog = self._up._up
+				form = dialog.TreeAndForm.FormWidget.form
+				error,data = dialog.getDataForForm(form)
+				if data is None:
+					QtGui.QMessageBox.critical(self,'No category selected','Select a setup category from the tree before exporting')
+					return
+				if error:
+					QtGui.QMessageBox.critical(self,'Errors in current data',error)
+					return
+				
+				fileName,filter = QtGui.QFileDialog.getSaveFileName(self,caption='Export to...',filter='SM exports (*.pkl)')
+				
+				f = open(fileName,'wb')
+				cPickle.dump((form.name,data),f)
+				f.close()
+
+
+		class ImportButton(BaseWidget,QtGui.QPushButton):
+			def init(self):
+				self._up.Layout.addWidget(self)
+				self.setText(self.tr('&Import settings (selected category)'))
+				
+			def onclicked(self):
+				dialog = self._up._up
+				form = dialog.TreeAndForm.FormWidget.form
+				if form is None:
+					QtGui.QMessageBox.critical(self,'No category selected','Select a setup category from the tree before exporting')
+					return
+				
+				fileName,filter = QtGui.QFileDialog.getOpenFileName(self,caption='Import from...',filter='SM exports (*.pkl)')
+				
+				f = open(fileName,'rb')
+				name,data = cPickle.load(f)
+				f.close()
+				
+				if form.name != name:
+					QtGui.QMessageBox.critical(self,'Invalid','Data is not valid for the selected category (data is %s, category is %s)'%(name,form.name))
+					return
+				
+				button = QtGui.QMessageBox.question(
+					self,
+					'Confirmation',
+					'This will overwrite all existing data for this category. Are you sure you want to proceed?',
+					buttons = QtGui.QMessageBox.Yes | QtGui.QMessageBox.No
+				)
+				if button != QtGui.QMessageBox.Yes:
+					return
+				
+				form.setValue(data)
+
+				
+	def getDataForForm(self,form):
+		if form is None:
+			return None,None
+		if not getattr(form,'_qt',None):
+			return None,None
+		error,data = form.getValueAndError()
+		errorString = ''
+		if error:
+			for k,v in data._errors.items():
+				field = getattr(self._up._up.form,k)
+				### TODO: add name of form/camera to error messages
+				if v is True:
+					errorString += '%s is invalid\n'%(field.label)
+				else:
+					errorString += '%s %s\n'%(field.label or field.name,v)
+		return errorString,data
+
+
+	def getDataForAll(self):
+		dialog = self
+		dataByForm = {}
+		errorString = ''
+		for form in dialog.cameraForms + [dialog.chdkForm]:
+			error,data = dialog.getDataForForm(form)
+			if error:
+				errorString += error
+			dataByForm[form.name] = data
+		return errorString,dataByForm
+
+
+	def closeEvent(self,e):
+		dialog = self
+		error,dataByForm = dialog.getDataForAll()
+		if  dataByForm != dialog.initialDataByForm:
+			button = QtGui.QMessageBox.question(
+				self,
+				'Confirmation',
+				'Data has not been saved. Are you sure you want to exit?',
+				buttons = QtGui.QMessageBox.Yes | QtGui.QMessageBox.No
+			)
+			if button != QtGui.QMessageBox.Yes:
+				e.ignore()
+				return 
+		return super(ConfigurationDialog,self).closeEvent(e)

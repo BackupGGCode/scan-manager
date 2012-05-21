@@ -35,7 +35,7 @@ class PostCaptureJob(ProcessingJob):
 		
 	def execute(self):
 		
-		camera = self.app.cameras[self.cameraIndex]
+		camera = self.app.cameras[self.cameraIndex-1]
 		
 		if not (camera.settings.get('undistort',None) and camera.settings.undistort.isActive()) and not (camera.settings.crop.get('enabled',False)):
 			# neither correction nor cropping configured so do not save a processed version
@@ -50,9 +50,9 @@ class PostCaptureJob(ProcessingJob):
 			self.pm = camera.settings.undistort.correct(self.pm)
 
 		# cropping
-		if camera.settings.undistort.crop.get('enabled',False):
+		if camera.settings.crop.get('enabled',False):
 			qi = self.pm.toImage()
-			c = camera.settings.undistort.crop.coords
+			c = camera.settings.crop.coords
 			size = qi.size()
 			qi = qi.copy(c[0],c[1],max(size.width()-c[2],c[0]+1),max(size.height()-c[3],c[1]+1))
 			self.pm = QtGui.QPixmap.fromImage(qi)

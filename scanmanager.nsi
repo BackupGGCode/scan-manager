@@ -1,6 +1,6 @@
 
-Name "ScanManager 0.4.8"
-OutFile "scanmanager-setup-windows-x86-0.4.8.exe"
+Name "ScanManager 0.5"
+OutFile "scanmanager-setup-windows-x86-0.5.exe"
 InstallDir "$PROGRAMFILES\ScanManager"
 InstallDirRegKey HKLM "Software\ScanManager" "Install_Dir"
 RequestExecutionLevel admin
@@ -69,6 +69,7 @@ Section "ScanManager (required)"
     File "/oname=pythoncom27.dll" "dist\pythoncom27.dll"
     File "/oname=pywintypes27.dll" "dist\pywintypes27.dll"
     File "/oname=scanmanager.exe" "dist\scanmanager.exe"
+    File "/oname=scanmanager.settings.default" "dist\scanmanager.settings.default"
     File "/oname=select.pyd" "dist\select.pyd"
     File "/oname=shiboken-python2.7.dll" "dist\shiboken-python2.7.dll"
     File "/oname=unicodedata.pyd" "dist\unicodedata.pyd"
@@ -247,7 +248,7 @@ Section "ScanManager (required)"
     ; Create an uninstaller
     WriteUninstaller "uninstall.exe"
 
-    WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\ScanManager" "DisplayName" "ScanManager Camera Control 0.4.8"
+    WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\ScanManager" "DisplayName" "ScanManager Camera Control 0.5"
     WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\ScanManager" "UninstallString" "$\"$INSTDIR\uninstall.exe$\""    
     WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\ScanManager" "QuietUninstallString" "$\"$INSTDIR\uninstall.exe$\" /S"
     
@@ -308,6 +309,7 @@ Section "Uninstall"
     Delete "$INSTDIR\pythoncom27.dll"
     Delete "$INSTDIR\pywintypes27.dll"
     Delete "$INSTDIR\scanmanager.exe"
+    Delete "$INSTDIR\scanmanager.settings.default"
     Delete "$INSTDIR\select.pyd"
     Delete "$INSTDIR\shiboken-python2.7.dll"
     Delete "$INSTDIR\unicodedata.pyd"

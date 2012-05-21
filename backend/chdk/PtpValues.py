@@ -22,7 +22,7 @@ def NameById(vendorId, inst, id):
 
 
 
-class SimpleTypes:
+class SimpleTypes(object):
     
     INT8                        = (0x0001, False, "b")
     UINT8                       = (0x0002, False, "B")
@@ -61,7 +61,7 @@ def SimpleTypeDetailsById(typeId):
 
 
 
-class Vendors:
+class Vendors(object):
 
     STANDARD                                = 0
     KODAK                                   = 1
@@ -92,7 +92,7 @@ def VendorNameById(vendorId):
 
 
 
-class StandardFunctionalModes:
+class StandardFunctionalModes(object):
     
     STANDARD                                = 0x0000
     SLEEP                                   = 0x0001
@@ -107,7 +107,7 @@ def FunctionalModeNameById(modeId, vendorId=Vendors.STANDARD):
 
 
 
-class StandardOperations:
+class StandardOperations(object):
 
     UNDEFINED                               = 0x1000
     GET_DEVICE_INFO                         = 0x1001
@@ -139,12 +139,12 @@ class StandardOperations:
     GET_PARTIAL_OBJECT                      = 0x101b
     INITATE_OPEN_CAPTURE                    = 0x101c
 
-class KodakOperations:
+class KodakOperations(object):
     
     SEND_FILE_OBJECT_INFO                   = 0x9005
     SEND_FILE_OBJECT                        = 0x9006
 
-class CanonOperations:
+class CanonOperations(object):
 
     GET_OBJECT_SIZE                         = 0x9001
     START_SHOOTING_MODE                     = 0x9008
@@ -161,7 +161,7 @@ class CanonOperations:
     GET_CHANGES                             = 0x9020
     GET_FOLDER_ENTRIES                      = 0x9021
 
-class NikonOperations:
+class NikonOperations(object):
 
     RAM_CAPTURE                             = 0x90c0
     AUTO_FOCUS                              = 0x90c1
@@ -190,7 +190,7 @@ def OperationNameById(operationId, vendorId=Vendors.STANDARD):
 
 
 
-class StandardResponses:
+class StandardResponses(object):
 
     UNDEFINED                               = 0x2000
     OK                                      = 0x2001
@@ -226,13 +226,13 @@ class StandardResponses:
     TRANSACTION_CANCELLED                   = 0x201f
     SPECIFICATION_OF_DESTINATION_UNSUPPORTED= 0x2020
 
-class KodakResponses:
+class KodakResponses(object):
     
     FILENAME_REQUIRED                       = 0xa001
     FILENAME_CONFLICTS                      = 0xa002
     FILENAME_INVALID                        = 0xa003
 
-class NikonResponses:
+class NikonResponses(object):
     
     ASYNC_OPERATION_FAILED                  = 0xa002
     PROPERTY_READ_ONLY                      = 0xa005
@@ -251,7 +251,7 @@ def ResponseNameById(responseId, vendorId=Vendors.STANDARD):
 
 
 
-class StandardEvents:
+class StandardEvents(object):
 
     UNDEFINED                               = 0x4000
     CANCEL_TRANSACTION                      = 0x4001
@@ -269,13 +269,13 @@ class StandardEvents:
     CAPTURE_COMPLETE                        = 0x400d
     UNREPORTED_STATUS                       = 0x400e
 
-class CanonEvents:
+class CanonEvents(object):
     
     DEVICE_INFO_CHANGED                     = 0xc008
     REQUEST_OBJECT_TRANSFER                 = 0xc009
     CAMERA_MODE_CHANGED                     = 0xc00c
 
-class NikonEvents:
+class NikonEvents(object):
     
     OBJECT_READY                            = 0xc101
     CAPTURE_OVERFLOW                        = 0xc102
@@ -294,7 +294,7 @@ def EventNameById(eventId, vendorId=Vendors.STANDARD):
 
 
 
-class StandardProperties:
+class StandardProperties(object):
 
     UNDEFINED                               = 0x5000
     BATTERY_LEVEL                           = 0x5001
@@ -329,7 +329,7 @@ class StandardProperties:
     ARTIST                                  = 0x501e
     COPYRIGHT_INFO                          = 0x501f
 
-class KodakProperties:
+class KodakProperties(object):
     
     COLOUR_TEMPERATURE                      = 0xd001
     DATE_TIME_STAMP_FORMAT                  = 0xd002
@@ -338,7 +338,7 @@ class KodakProperties:
     POWER_SAVING                            = 0xd005
     UI_LANGUAGE                             = 0xd006
 
-class CanonProperties:
+class CanonProperties(object):
     BEEP_MODE                               = 0xd001
     VIDEFINDER_MODE                         = 0xd003
     IMAGE_QUALITY                           = 0xd006
@@ -364,7 +364,7 @@ class CanonProperties:
     PHOTO_EFFECT                            = 0xd040
     ASSIST_LIGHT                            = 0xd041
 
-class NikonProperties:
+class NikonProperties(object):
     SHOOTING_BANK                           = 0xD010
     SHOOTING_BANK_NAME_A                    = 0xD011
     SHOOTING_BANK_NAME_B                    = 0xD012
@@ -499,7 +499,7 @@ def PropertyNameById(propertyId, vendorId=Vendors.STANDARD):
 
 
 
-class StandardObjectFormats:
+class StandardObjectFormats(object):
     ASSOCIATION                             = 0x3001
     SCRIPT                                  = 0x3002
     EXECUTABLE                              = 0x3003
@@ -527,7 +527,7 @@ class StandardObjectFormats:
     JP2                                     = 0x380F
     JPX                                     = 0x3810
 
-class KodakObjectFormats:
+class KodakObjectFormats(object):
     M3U                                     = 0xb002
 
 def ObjectFormatNameById(formatId, vendorId=Vendors.STANDARD):
@@ -541,7 +541,7 @@ def ObjectFormatNameById(formatId, vendorId=Vendors.STANDARD):
 
 
 
-class StandardStorageTypes:
+class StandardStorageTypes(object):
     UNDEFINED                               = 0x0000
     FIXED_ROM                               = 0x0001
     REMOVABLE_ROM                           = 0x0002
@@ -556,7 +556,7 @@ def StorageTypeNameById(typeId, vendorId=Vendors.STANDARD):
 
 
 
-class StandardFilesystemTypes:
+class StandardFilesystemTypes(object):
     UNDEFINED                               = 0x0000
     GENERIC_FLAT                            = 0x0001
     GENERIC_HIERARCHICAL                    = 0x0002
@@ -572,7 +572,7 @@ def FilesystemTypeNameById(typeId, vendorId=Vendors.STANDARD):
 
 
 
-class StandardAccessCapability:
+class StandardAccessCapability(object):
     RW                                      = 0x0000
     RO_WITHOUT_DELETION                     = 0x0001
     RO_WITH_DELETION                        = 0x0002
@@ -583,7 +583,7 @@ def AccessCapabilityNameById(capId, vendorId=Vendors.STANDARD):
     return NameById(vendorId, inst, capId)
 
 
-class StandardProtectionStatus:
+class StandardProtectionStatus(object):
     NO_PROTECTION                           = 0x0000
     READ_ONLY                               = 0x0001
 
@@ -594,7 +594,7 @@ def ProtectionStatusNameById(capId, vendorId=Vendors.STANDARD):
 
 
 
-class StandardAssociationTypes:
+class StandardAssociationTypes(object):
     UNDEFINED                               = 0x0000
     GENERIC_FOLDER                          = 0x0001
     ALBUM                                   = 0x0002
@@ -613,7 +613,7 @@ def AssociationTypeNameById(typeId, vendorId=Vendors.STANDARD):
 
 
 
-class GetSet:
+class GetSet(object):
     GET                                     = 0x0000
     GET_SET                                 = 0x0001
     
@@ -622,7 +622,7 @@ def GetSetNameById(typeId, vendorId=Vendors.STANDARD):
     return NameById(vendorId, inst, typeId)
 
 
-class StandardWhiteBalanceTypes:
+class StandardWhiteBalanceTypes(object):
     UNDEFINED                               = 0x0000
     MANUAL                                  = 0x0001
     AUTOMATIC                               = 0x0002
@@ -632,7 +632,7 @@ class StandardWhiteBalanceTypes:
     TUNGSTEN                                = 0x0006
     FLASH                                   = 0x0007
     
-class NikonWhiteBalanceTypes:
+class NikonWhiteBalanceTypes(object):
     CLOUDY                                  = 0x8010
     SHADE                                   = 0x8011
     PRESET                                  = 0x8013
@@ -640,13 +640,13 @@ class NikonWhiteBalanceTypes:
 # FIXME
 
 
-class StandardFocusModes:
+class StandardFocusModes(object):
     UNDEFINED                               = 0x0000
     MANUAL                                  = 0x0001
     AUTOMATIC                               = 0x0002
     AUTOMATIC_MACRO                         = 0x0003
     
-class NikonFocusModes:
+class NikonFocusModes(object):
     AF_S                                    = 0x8010
     AF_C                                    = 0x8011
     AF_A                                    = 0x8012
@@ -655,7 +655,7 @@ class NikonFocusModes:
 
 
 
-class StandardExposureMeteringModes:
+class StandardExposureMeteringModes(object):
     UNDEFINED                               = 0x0000
     AVERAGE                                 = 0x0001
     CENTER                                  = 0x0002
@@ -665,7 +665,7 @@ class StandardExposureMeteringModes:
 # FIXME
 
 
-class StandardFlashModes:
+class StandardFlashModes(object):
     UNDEFINED                               = 0x0000
     AUTO_FLASH                              = 0x0001
     FLASH_OFF                               = 0x0002
@@ -674,7 +674,7 @@ class StandardFlashModes:
     RED_EYE_FILL                            = 0x0005
     EXTERNAL_SYNC                           = 0x0006
     
-class NikonFlashModes:
+class NikonFlashModes(object):
     DEFAULT                                 = 0x8010
     SLOW                                    = 0x8011
     REAR                                    = 0x8012
@@ -682,7 +682,7 @@ class NikonFlashModes:
     
 # FIXME
 
-class StandardExposureProgramModes:
+class StandardExposureProgramModes(object):
     UNDEFINED                               = 0x0000
     MANUAL                                  = 0x0001
     AUTOMATIC                               = 0x0002
@@ -692,7 +692,7 @@ class StandardExposureProgramModes:
     PROGRAM_ACTION                          = 0x0006
     PORTRAIT                                = 0x0007
     
-class NikonExposureProgramModes:
+class NikonExposureProgramModes(object):
     POINT_AND_SHOOT                         = 0x8010
     PORTRAIT                                = 0x8011
     LANDSCAPE                               = 0x8012
@@ -703,13 +703,13 @@ class NikonExposureProgramModes:
 
 # FIXME
 
-class StandardStillCaptureModes:
+class StandardStillCaptureModes(object):
     UNDEFINED                               = 0x0000
     NORMAL                                  = 0x0001
     BURST                                   = 0x0002
     TIMELAPSE                               = 0x0003
 
-class NikonStillCaptureModes:
+class NikonStillCaptureModes(object):
     TIMER                                   = 0x8011
     REMOTE                                  = 0x8013
     TIMER_REMOTE                            = 0x8014
@@ -717,19 +717,19 @@ class NikonStillCaptureModes:
 # FIXME
 
 
-class StandardFocusMeteringModes:
+class StandardFocusMeteringModes(object):
     UNDEFINED                               = 0x0000
     CENTER_SPOT                             = 0x0001
     MULTI_SPOT                              = 0x0002
     
-class NikonFocusMeteringModes:
+class NikonFocusMeteringModes(object):
     SINGLE                                  = 0x8010
     CLOSEST_SUBJECT                         = 0x8011
 
 # FIXME
 
 
-class NikonLowLightIndicatorValues:
+class NikonLowLightIndicatorValues(object):
     OK                                      = 0
     APERTURE_LOW                            = 1
     APERTURE_HIGH                           = 2
@@ -738,7 +738,7 @@ class NikonLowLightIndicatorValues:
 
 # FIXME
 
-class NikonCameraOrientations:
+class NikonCameraOrientations(object):
     LEVEL                                   = 0
     LEFT                                    = 1
     RIGHT                                   = 2

@@ -3,7 +3,7 @@
 import struct
 
 
-class PtpRequest:
+class PtpRequest(object):
     """Class encapsulating a PTP Request."""
 
     def __init__(self, opcode, sessionid, transactionid, params=None):
@@ -19,7 +19,7 @@ class PtpRequest:
         return tmp
         
 
-class PtpResponse:
+class PtpResponse(object):
     """Class encapsulating a PTP Response."""
 
     def __init__(self, respcode, sessionid, transactionid, params=None):
@@ -35,7 +35,7 @@ class PtpResponse:
         return tmp
 
 
-class PtpEvent:
+class PtpEvent(object):
     """Class encapsulating a PTP Event."""
 
     def __init__(self, eventcode, sessionid, transactionid, params=None):
@@ -52,7 +52,7 @@ class PtpEvent:
 
 
 
-class PtpAbstractTransport:
+class PtpAbstractTransport(object):
     """Class defining an abstract PTP transport."""
 
     def __init__(self):

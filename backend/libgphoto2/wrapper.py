@@ -90,7 +90,6 @@ class Camera(interface.Camera):
 		self.camera = camera
 		self.viewfinderThread = None
 		self.opened = False
-		self.inited = False
 		self.afterOpened = False
 		self.config = None
 		self.configWidgets = {} 
@@ -100,13 +99,6 @@ class Camera(interface.Camera):
 		self.hasCaptureEvents = None #: None means automatically guess whether capture events are supported
 		
 		self.name = '%s %s'%(self.camera.getModel(),self.camera.getPort())
-		
-		self.init()
-		
-		try:
-			self.name = '%s %s'%(self.camera.getModel(),self.configWidgets['ownername']['value'])
-		except:
-			pass
 
 		
 	def getName(self):
@@ -117,9 +109,14 @@ class Camera(interface.Camera):
 		if self.opened:
 			return
 		
-		self.init()
-		
 		self.opened = True
+		self.camera.init()
+		self.properties = []
+		self.nameToProperty = {}
+
+		# fetch current camera config
+		self.configurationFromCamera()
+		
 		# try to wake the camera up so we get a complete set of properties to work with
 		changed = False
 		if 'capture' in self.configWidgets and self.configWidgets['capture']['value'] != 1:
@@ -168,7 +165,7 @@ class Camera(interface.Camera):
 
 	
 	def close(self):
-		if not self.inited:
+		if not self.opened:
 			return
 		
 		try:
@@ -182,7 +179,6 @@ class Camera(interface.Camera):
 				self.configurationToCamera()
 		except:
 			log.logException('unable to turn off capture mode', log.WARNING)
-		self.inited = False
 		self.opened = False
 		self.camera.exit()
 			
@@ -247,20 +243,6 @@ class Camera(interface.Camera):
 	# Non-interface
 	#
 	
-
-	def init(self):
-		if self.inited:
-			return
-		self.inited = True
-		self.camera.init()
-		self.afterOpened = True
-		self.properties = []
-		self.nameToProperty = {}
-
-		# fetch current camera config
-		self.configurationFromCamera()
-		
-	
 	def configurationToCamera(self):
 		n = 0
 		toClear = []
@@ -312,7 +294,7 @@ class Camera(interface.Camera):
 					property = GPhotoCameraButton(self,widget['name']) 
 				else: 
 					property = GPhotoCameraValueProperty(self,widget['name'])
-				property.section = section
+				property.section = section['label']
 				self.properties.append(property)
 				self.nameToProperty[widget['name']] = property
 	
@@ -324,18 +306,15 @@ class Camera(interface.Camera):
 		return self.nameToProperty[name]
 	
 	
-	savedProperties = [
-		'imagequality','imagesize','iso','whitebalance','zoom','shootingmode','aperture','shutterspeed','afdistance'
-	]
-	
-	
 	def saveSettings(self):
 		saved = []
-		for name in self.savedProperties:
-			if name not in self.configWidgets:
-				continue
-			value = self.configWidgets[name]['value']
-			saved.append((name,value))
+		if 'config' in self.settings:
+			savedProperties = [i['control'] for i in self.settings.config.savedProperties]
+			for name in savedProperties:
+				if name not in self.configWidgets:
+					continue
+				value = self.configWidgets[name]['value']
+				saved.append((name,value))
 		self.settings.savedProperties = saved
 		
 		
@@ -345,6 +324,9 @@ class Camera(interface.Camera):
 		saved = list(self.settings.savedProperties)
 		saved.reverse()
 		for name,value in saved:
+			if name not in self.configWidgets:
+				log.warning('could not find property %s to restore'%name)
+				continue
 			self.configWidgets[name]['value'] = value
 			self.configWidgets[name]['changed'] = True
 		
@@ -404,9 +386,10 @@ class GPhotoCameraValueProperty(interface.CameraValueProperty):
 		super(GPhotoCameraValueProperty,self).__init__()
 		self.camera = camera
 		self.widgetId = widgetId
+		self.name = self.widget['label']
 
 	def getName(self):
-		return self.widget['label']
+		return self.name
 	
 	def getIdent(self):
 		return self.widget['name']
@@ -471,7 +454,7 @@ class GPhotoCameraValueProperty(interface.CameraValueProperty):
 		return self.widget['readonly']
 	
 	def getSection(self):
-		return self.section['label']
+		return self.section
 	
 	#
 	# Non-interface

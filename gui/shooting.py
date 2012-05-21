@@ -189,6 +189,12 @@ class MainWindow(BaseWidget,QtGui.QMainWindow):
 		self.app.captureThreads = {}
 		self.startCaptureThreads()
 		
+		# auto-start the viewfinder if that is configured
+		for ndx,camera in enumerate(self.app.cameras):
+			if not camera.hasViewfinder():
+				continue
+			if 'config' in camera.settings and camera.settings.config.startViewfinder:
+				camera.startViewfinder()
 		
 	def startCaptureThreads(self):
 		""" start the per-camera capture threads as needed """
@@ -383,15 +389,18 @@ class MainWindow(BaseWidget,QtGui.QMainWindow):
 		
 	def oncaptureComplete(self,event):
 		cameraIndex = self.app.cameras.index(event.camera) + 1
+		if cameraIndex == 0:
+			raise Exception('Camera not found: event has %r and current cameras are %r'%(event.camera,self.app.cameras))
 		pm = QtGui.QPixmap()
 		pm.loadFromData(event.data)
 		
 		# rotation for preview only
-		angle = event.camera.settings.rotate[cameraIndex]
-		if angle:
-			transform = QtGui.QTransform()
-			transform.rotate(angle)
-			pm = pm.transformed(transform)
+		if 'rotate' in event.camera.settings:
+			angle = event.camera.settings.rotate
+			if angle:
+				transform = QtGui.QTransform()
+				transform.rotate(angle)
+				pm = pm.transformed(transform)
 			
 		image = self.app.imageManager.addFromData(pm=pm,cameraIndex=cameraIndex,withPreview=True)
 		for fn in event.getAuxFiles():

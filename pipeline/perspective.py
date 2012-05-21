@@ -35,7 +35,7 @@ class CalibrationControlsBox(BaseWidget,QtGui.QGroupBox):
 			
 		def update(self):
 			cameraIndex = self._up._up.getCameraIndex()
-			if self.app.settings.calibrators[cameraIndex] and self.app.settings.calibrators[cameraIndex].isReady():
+			if self.aq.camera.settings.undistort[cameraIndex] and self.aq.camera.settings.undistort[cameraIndex].isReady():
 				self.setText(self.tr('<p>Calibration configured</p>'))
 			else:
 				self.setText(self.tr('<p>No calibration configured</p>'))
@@ -47,7 +47,7 @@ class CalibrationControlsBox(BaseWidget,QtGui.QGroupBox):
 			self.setText(self.tr('Correct images using calibration data'))
 			self.app.calibrationDataChanged.connect(self.update)
 			cameraIndex = self._up._up.getCameraIndex()
-			if self.app.settings.calibrators[cameraIndex] and self.app.settings.calibrators[cameraIndex].isActive():
+			if self.aq.camera.settings.undistort[cameraIndex] and self.aq.camera.settings.undistort[cameraIndex].isActive():
 				self.setChecked(True)
 			else:
 				self.setChecked(False) 
@@ -55,13 +55,13 @@ class CalibrationControlsBox(BaseWidget,QtGui.QGroupBox):
 			
 		def onstateChanged(self):
 			cameraIndex = self._up._up.getCameraIndex()
-			if self.app.settings.calibrators[cameraIndex]:
-				self.app.settings.calibrators[cameraIndex].setActive(self.isChecked())
+			if self.aq.camera.settings.undistort[cameraIndex]:
+				self.aq.camera.settings.undistort[cameraIndex].setActive(self.isChecked())
 				
 
 		def update(self):
 			cameraIndex = self._up._up.getCameraIndex()
-			if self.app.settings.calibrators[cameraIndex] and self.app.settings.calibrators[cameraIndex].isReady():
+			if self.aq.camera.settings.undistort[cameraIndex] and self.aq.camera.settings.undistort[cameraIndex].isReady():
 				self.show()
 			else:
 				self.hide()

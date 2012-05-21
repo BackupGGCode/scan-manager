@@ -30,9 +30,23 @@ class CameraControls(BaseWidget,QtGui.QTabWidget):
 		self.addTab(tab,'General')
 		self.tabs['General'] = tab
 		
-		for property in camera.getProperties():
+		toDo = []
+		if 'config' in camera.settings and camera.settings.config.cameraControls:
+			# use camera controls specified in configuration
+			toDo = camera.settings.config.cameraControls
+		else:
+			# show all camera controls arranged into their default tabs
+			toDo = [dict(ident=p.getIdent(),section=p.getSection()) for p in camera.getProperties()]
 			
-			section = property.getSection()
+		propertyByIdent = {p.getIdent():p for p in camera.getProperties()}
+		
+		for item in toDo:
+			
+			if item['ident'] not in propertyByIdent:
+				continue 
+			property = propertyByIdent[item['ident']]
+			section = item['section']
+			
 			if section not in self.tabs:
 				tab = CameraControlsTab(self)
 				self.addTab(tab,section)
@@ -191,7 +205,7 @@ class GeneralTab(CameraControlsTab):
 							
 	
 					def update(self):
-						if 'undistort' in self.aq.camera.settings.undistort and self.aq.camera.settings.undistort.isReady():
+						if 'undistort' in self.aq.camera.settings and self.aq.camera.settings.undistort.isReady():
 							self.show()
 						else:
 							self.hide()
@@ -225,7 +239,7 @@ class GeneralTab(CameraControlsTab):
 						dialog = calibrate.CalibrateDialog(self)
 						dialog.setModal(True)
 						dialog.open()
-						dialog.go(preview.pixmaps['raw'],cameraIndex=cameraIndex)
+						dialog.go(preview.pixmaps['raw'],camera=self.aq.camera)
 	
 	
 			class CropControlsBox(BaseWidget,QtGui.QGroupBox):

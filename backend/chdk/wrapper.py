@@ -13,6 +13,7 @@ from . import PtpCHDK
 from . import PtpValues
 from .chdkconstants import *
 
+
 import os.path
 import platform
 import threading
@@ -92,6 +93,7 @@ class Camera(interface.Camera):
 		self.opened = False
 		self.afterOpened = False
 		self.viewfinderThread = None
+		self.filesDownloaded = {}
 		super(Camera,self).__init__(api)
 
 		self.ptpLocation = ptpLocation
@@ -105,6 +107,7 @@ class Camera(interface.Camera):
 		
 		self.vendorId = self.deviceInfo.VendorExtensionID
 		
+		self.executeLock = threading.Lock()
 
 
 	def getName(self):	
@@ -119,11 +122,15 @@ class Camera(interface.Camera):
 		
 		self.version = self.ptpSession.GetVersion()
 		
-		self.execute('switch_mode_usb(1)')
+		self.lastCheck = str(self.execute('switch_mode_usb(1)\nreturn os.time()'))
 		
 		self.createProperties()
 		
 		self.afterOpened = True
+		
+		if 'config' in self.api.settings and self.api.settings.config.downloadMode == 'background':
+			self.downloadThread = DownloadThread(self)
+			self.downloadThread.start()
 
 
 	def hasViewfinder(self):
@@ -150,11 +157,15 @@ class Camera(interface.Camera):
 		except: 
 			pass
 		
-		### TODO: TEMP: uncomment this!
-		#try:
-		#	self.execute('switch_mode_usb(0)')
-		#except:
-		#	pass
+		try:
+			self.downloadThread.stopped = True
+		except: 
+			pass
+		
+		try:
+			self.execute('switch_mode_usb(0)')
+		except:
+			pass
 
 	
 	def ontimer(self):
@@ -167,20 +178,19 @@ class Camera(interface.Camera):
 		
 		
 	def startViewfinder(self):
-		if self.viewfinderThread and not self.viewfinderThread.stopped:
-			return 
+		if self.isViewfinderStarted():
+			return
 		self.viewfinderThread = ViewfinderCaptureThread(self)
 		self.viewfinderThread.start()
 
 
 	def stopViewfinder(self):
-		if self.viewfinderThread:
-			self.viewfinderThread.stopped = True
-			self.viewfinderThread.join()
+		if self.isViewfinderStarted():
+			self.viewfinderThread.stop()
 
 
 	def isViewfinderStarted(self):
-		if self.viewfinderThread and not self.viewfinderThread.stopped:
+		if self.viewfinderThread and self.viewfinderThread.isAlive():
 			return True
 		else:
 			return False
@@ -201,9 +211,37 @@ class Camera(interface.Camera):
 				self.startViewfinder()
 	
 
+	def downloadNewImages(self):
+		
+		script = self.api.settings.config.listNewFilesScript
+		script = script.replace('##LASTTIME##',self.lastCheck)
+		
+		rc = self.execute(script)
+		
+		startTimeForCurrent = str(rc['started'])
+		del(rc['started'])
+		
+		if not rc:
+			return 
+
+		self.lastCheck = startTimeForCurrent
+		
+		toRemove = []
+		for file in rc.values():
+			if file in self.filesDownloaded:
+				continue
+			toRemove.append(file)
+			self.filesDownloaded[file] = True
+			data = self.ptpSession.Download(file)
+			e = interface.CaptureCompleteEvent(self,data=data,auxFiles=[])
+			self.captureComplete.emit(e)
+			
+		self.execute('\n'.join(['os.remove("%s")'%file for file in toRemove]))
+
+
 	def execute(self,script,expectMessages=False,blind=False,messageCallback=None,*args):
 
-		with self.viewfinderDisabled():
+		with self.viewfinderDisabled(),self.executeLock:
 		
 			scriptId,rc = self.ptpSession.ExecuteScript(script)
 			
@@ -237,7 +275,7 @@ class Camera(interface.Camera):
 					continue
 				elif rc == ScriptStatusFlag.MSG:
 					msg = self.ptpSession.ReadScriptMessage(scriptId=scriptId)
-					if msg.type == ScriptMessageType.NONE:
+					if msg is None:
 						# no message
 						continue
 					if messageCallback:
@@ -268,6 +306,16 @@ class Camera(interface.Camera):
 		self.properties = []
 		for property in self.api.propertyClasses:
 			self.properties.append(property(self,None))
+			
+		if 'config' not in self.api.settings:
+			return
+		
+		config = self.api.settings.config
+		
+		for control in config.chdkControls:
+			property = CHDKCameraValueProperty(camera=self,config=control)
+			property.setup()
+			self.properties.append(property)
 	
 	
 	
@@ -313,6 +361,57 @@ class ViewfinderCaptureThread(threading.Thread):
 
 
 
+class DownloadThread(threading.Thread):
+	
+	def __init__(self,camera):
+		super(DownloadThread,self).__init__()
+		self.camera = camera
+		self.stopped = False
+		self.paused = False
+		self.lastCheck = str(self.camera.execute('return os.time()'))
+		self.done = {}
+
+		
+	def run(self):
+		while 1:
+			while self.paused:
+				if self.stopped:
+					break
+				time.sleep(0.1)
+			
+			if self.stopped:
+				break
+			
+			self.camera.downloadNewImages()
+										
+			time.sleep(1.0)
+			
+			
+	def stop(self):
+		self.stopped = True
+		self.join(10.0)
+		
+		
+	def pause(self):
+		self.paused = True
+		
+		
+	def unpause(self):
+		self.paused = True
+
+
+
+def tolua(value):
+	if type(value) is unicode:
+		return repr(str(value))
+	elif type(value) is dict:
+		return '{%s}'%(','.join(['%s=%s'%(k,tolua(i)) for k,i in value.items()]))
+	elif type(value) is list:
+		return '{%s}'%(','.join([tolua(i) for i in value]))
+	else:
+		return repr(value)
+
+
 class CHDKCameraValueProperty(interface.CameraValueProperty):
 	
 	def __init__(self,camera,config):
@@ -320,23 +419,25 @@ class CHDKCameraValueProperty(interface.CameraValueProperty):
 		self.camera = camera
 		self.config = config
 		self.options = []
-		self.range = dict(min=0,max=1,step=1)
+		self.range = dict(min=0,max=10,step=1)
 		self.readOnly = False
 
 	def getName(self):
-		return self.config.name
+		return self.config['label']
 	
 	def getIdent(self):
-		return self.config.ident
+		return self.config['name']
 
 	def getControlType(self):
-		return self.config.controlType
+		return self.config['controlType']
 		
 	def getRawValue(self):
-		return self.camera.execute(self.config.getValue)
+		return self.execute(self.config['getValueScript'])
 	
 	def setRawValue(self,v):
-		self.camera.execute(self.config.setValue,str(v))
+		script = self.config['setValueScript']
+		script = script.replace('##VALUE##',tolua(v))
+		return self.execute(script)
 		
 	def rawToDisplay(self,rawValue):
 		return rawValue
@@ -363,22 +464,86 @@ class CHDKCameraValueProperty(interface.CameraValueProperty):
 		return self.readOnly
 	
 	def getSection(self):
-		return self.config.section
+		return self.config['tab']
 	
+	def go(self):
+		return self.execute(self.config['executeScript'],'executeScript')
+			
 	#
 	# Non-interface
 	#
+	def execute(self,script,scriptName='<unknown>'):
+		try:
+			return self.camera.execute(script)
+		except CHDKError:
+			log.logException('LUA script error in %s->%s'%(self.getName(),scriptName), log.ERROR)
+		
 	
 	def setup(self):
+		
 		ct = self.getControlType()
-		if ct != interface.ControlType.Static:
-			self.readOnly = self.camera.execute(self.config.readOnly)
+		
+		if ct != interface.ControlType.Static and self.config['readOnlyScript']:
+			self.readOnly = self.execute(self.config['readOnlyScript'],'readOnlyScript')
+			
 		if ct == interface.ControlType.Combo:
-			self.options = self.camera.execute(self.config.options)
+			if self.config['optionsScriptType'] == 'fixed':
+				options = self.config['optionsFixedValue'].strip().replace('\r','').split('\n')
+				self.options = [(i,i) for i in options]
+			else:
+				options = self.execute(self.config['optionsScript'],'optionsScript')
+				if options is None:
+					return
+				self.options = [None] * len(options)
+				for k,v in options.items():
+					self.options[k] = (v,v)
 		elif ct == interface.ControlType.Slider:
-			self.range = self.camera.execute(self.config.getRange)
+			if self.config['rangeScriptType'] == 'fixed':
+				try:
+					l = self.config['rangeFixedValue'].strip().split(',')
+					self.range = dict(min=int(l[0]),max=int(l[1]),step=int(l[2]))
+				except:
+					raise Exception('Invalid fixed range string for CHDK control %s'%self.getName())
+			else:
+				if not self.config['rangeScript']:
+					raise Exception('You must supply a range script for CHDK control %s'%self.getName())
+				range = self.execute(self.config['rangeScript'],'rangeScript')
+				if range is None:
+					return
+				self.range = dict(min=int(range['min']),max=int(range['max']),step=int(range['step']))
 		else:
 			return
 	
 
-API.propertyClasses = []
+class SpecialCameraButton(interface.CameraValueProperty):
+
+	def __init__(self,camera,property):
+		super(SpecialCameraButton,self).__init__()
+		self.camera = camera
+		self.property = property
+	
+	def getName(self):
+		return self.name
+	
+	def getIdent(self):
+		return self.propertyId
+
+	def getControlType(self):
+		return self.controlType
+		
+	def getRawValue(self):
+		return True
+	
+	def isReadOnly(self):
+		return False
+	
+class DownloadNewImages(SpecialCameraButton):
+	propertyId = 'downloadNewImages'
+	name = 'Download new images'
+	section = 'Capture Settings'
+	controlType = interface.ControlType.Button
+	def go(self):
+		self.camera.downloadNewImages()
+
+
+API.propertyClasses = [DownloadNewImages]

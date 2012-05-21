@@ -31,10 +31,13 @@ class CHDKConsole(BaseWidget,QtGui.QWidget):
 			self.setReadOnly(True)
 			self.setFont(QtGui.QFont('Courier New'))
 			self.setWordWrapMode(QtGui.QTextOption.NoWrap)
+			self.setTabStopWidth(40)
 			self.append('[INITIALISED]')
 			self._up.Layout.addWidget(self,1)
 			
 		def messageHandler(self,msg):
+			if msg.type == chdkconstants.ScriptMessageType.RET:
+				return
 			typeName = chdkconstants.ScriptMessageType[msg.type]
 			self.append('<span style="color: blue;"><b>[MESSAGE]</b> type=%s value=%r</span><br/>'%(typeName,msg.value))
 
@@ -56,6 +59,7 @@ class CHDKConsole(BaseWidget,QtGui.QWidget):
 			self.setMinimumHeight(50)
 			self.setFont(QtGui.QFont('Courier New'))
 			self.setWordWrapMode(QtGui.QTextOption.NoWrap)
+			self.setTabStopWidth(40)
 			self._up.Layout.addWidget(self)
 
 			self.executeShortcut = QtGui.QShortcut(QtGui.QKeySequence("Ctrl+E"),self) 
