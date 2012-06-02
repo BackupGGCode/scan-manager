@@ -6,8 +6,8 @@ import math
 #
 # Start Crop Stuff
 #
-linePen = QtGui.QPen(QtGui.QColor(133,133,255),1.0,Qt.DotLine,Qt.RoundCap,Qt.RoundJoin)
-handleBrush = QtGui.QBrush(QtGui.QColor(133,133,255))
+linePen = QtGui.QPen(QtGui.QColor(0xFF,0x00,0x00),2.0,Qt.DotLine,Qt.RoundCap,Qt.RoundJoin)
+handleBrush = QtGui.QBrush(QtGui.QColor(0xFF,0x00,0x00))
 
 class CropHandle(QtGui.QGraphicsRectItem):
 	def __init__(self,cropBox):
@@ -113,6 +113,7 @@ class CropLine(QtGui.QGraphicsLineItem):
 
 class CropBox(object):
 	def __init__(self,view,scene):
+		self._blockUpdates = False
 		self.view = view
 		self.scene = scene
 		self.tl = CropHandle(self)
@@ -142,6 +143,12 @@ class CropBox(object):
 		for i in self.lines + self.handles:
 			i.show()
 
+	def isVisible(self):			
+		return self.handles[0].isVisible()
+	
+	def blockUpdates(self,setting):
+		self._blockUpdates = setting
+
 	def _setRect(self,rect):		
 		self.tl.setCenterPos(rect.topLeft())
 		self.tr.setCenterPos(rect.topRight())
@@ -149,8 +156,10 @@ class CropBox(object):
 		self.br.setCenterPos(rect.bottomRight())
 		
 	def setRect(self,rect):
+		self.blockUpdates(True)
 		self._setRect(rect)
 		self.recalc()
+		self.blockUpdates(False)
 		
 	def recalc(self):
 		if getattr(self,'lastrect',None):
@@ -159,7 +168,6 @@ class CropBox(object):
 		for line in self.lines:
 			line.handleMoved(line.handle1,line.handle1.getCenterPos())
 			line.handleMoved(line.handle2,line.handle2.getCenterPos())
-		self.scene.setSceneRect(self.scene.itemsBoundingRect())
 		
 	def getImageRect(self):
 		rect = QtCore.QRectF(self.tl.getCenterPos(),self.br.getCenterPos())
@@ -171,8 +179,10 @@ class CropBox(object):
 	def rectChanged(self):
 		rect = self.getImageRect()
 		self.lastrect = rect
-		coords = tuple([int(round(i)) for i in rect.getCoords()])
-		self.view.app.cropboxChanged.emit(self.view,coords) 
+		if self._blockUpdates:
+			return
+		rect = QtCore.QRect(*tuple([int(round(i)) for i in rect.getRect()]))
+		self.view._up.cropBoxChanged.emit(rect) 
 
 
 #
@@ -184,6 +194,9 @@ MAX_SCALE = 2.00
 
 
 class ImageViewer(BaseWidget,QtGui.QWidget):
+	
+	cropBoxChanged = QtCore.Signal(QtCore.QRect)
+	pixmapChanged = QtCore.Signal(QtGui.QPixmap)
 
 	def init(self):
 		self._pm = QtGui.QPixmap()
@@ -212,7 +225,7 @@ class ImageViewer(BaseWidget,QtGui.QWidget):
 
 			# crop box set up
 			self._up.cropBox = CropBox(self,self._scene)
-			self._up.cropBox.setRect(QtCore.QRectF(0,0,400.0,400.0))
+			#self._up.cropBox.setRect(QtCore.QRectF(0,0,400.0,400.0))
 			self._up.cropBox.hide()
 
 			self.currentCenter = None
@@ -228,8 +241,10 @@ class ImageViewer(BaseWidget,QtGui.QWidget):
 			
 		def setTransform(self,transform):
 			QtGui.QGraphicsView.setTransform(self,transform)
-			# crop box (allow it to rescale lines) 
-			self._up.cropBox.recalc()
+			if self._up.cropBox.isVisible():
+				# crop box (allow it to rescale lines) 
+				self._up.cropBox.recalc()
+			self._scene.setSceneRect(self._scene.itemsBoundingRect())
 			
 		def wheelEvent(self, event):
 			if self._up.fitToWindowAct.isChecked():
@@ -285,11 +300,13 @@ class ImageViewer(BaseWidget,QtGui.QWidget):
 	def load(self,image):
 		self._pm.load(image)
 		self.loadFromData(self._pm)
+		self.pixmapChanged.emit(self._pm)
 
 
 	def clear(self):
 		self._pm = QtGui.QPixmap()
 		self.ImageView.setPixmap(self._pm)
+		self.pixmapChanged.emit(self._pm)
 
 		
 	def loadFromData(self,data):
@@ -310,6 +327,7 @@ class ImageViewer(BaseWidget,QtGui.QWidget):
 			self.rescale()
 			self.updateActions()
 			self.updateSlider()
+		self.pixmapChanged.emit(self._pm)
 
 
 	def zoomIn(self):
@@ -438,6 +456,8 @@ class ImageViewer(BaseWidget,QtGui.QWidget):
 
 
 class ImagePipelineViewer(ImageViewer):
+
+	stateChanged = QtCore.Signal(str)
 	
 	def init(self):
 		self.pixmaps = {}
@@ -446,7 +466,7 @@ class ImagePipelineViewer(ImageViewer):
 		self.fitToWindowAct.setEnabled(True)
 		self.fitToWindowAct.setChecked(True)
 		self.Toolbar.Slider.setEnabled(False)
-		self.selectState('raw')
+		self.cropBoxState = {}
 		
 	class Layout(BaseLayout,QtGui.QVBoxLayout):
 		
@@ -474,13 +494,23 @@ class ImagePipelineViewer(ImageViewer):
 	@property
 	def _pm(self):
 		state = self.TabBar.tabText(self.TabBar.currentIndex())
-		return self.pixmaps[state]
+		return self.pixmaps.get(state,None)
+
+	@property
+	def currentState(self):
+		if isinstance(self.TabBar,QtGui.QWidget):
+			return self.TabBar.tabText(self.TabBar.currentIndex())
 
 
 	def selectState(self,state):
 		if state not in self.pixmaps:
 			self.pixmaps[state] = QtGui.QPixmap()
 		self.ImageView.setPixmap(self.pixmaps[state])
+		
+		if self.cropBoxState.get(state,False) and self.pixmaps[state] and not self.pixmaps[state].isNull():
+			self.cropBox.show()
+		else:
+			self.cropBox.hide()
 			
 		if self.fitToWindowAct.isChecked():
 			self.fitToWindow()
@@ -489,6 +519,17 @@ class ImagePipelineViewer(ImageViewer):
 			self.rescale()
 			self.updateActions()
 			self.updateSlider()
+		self.pixmapChanged.emit(self._pm)
+		self.stateChanged.emit(state)
+			
+	
+	def setCropboxForState(self,state,setting):
+		self.cropBoxState[state] = setting
+		if self.currentState == state:
+			if setting:
+				self.cropBox.show()
+			else:
+				self.cropBox.hide()
 
 		
 	def load(self,state,image):
@@ -499,8 +540,10 @@ class ImagePipelineViewer(ImageViewer):
 
 
 	def clear(self):
-		self.pixmaps = {}
-		self.ImageView.setPixmap(QtGui.QPixmap())
+		for k in self.pixmaps:
+			self.pixmaps[k] = QtGui.QPixmap()
+		self.ImageView.setPixmap(self._pm)
+		self.pixmapChanged.emit(self._pm)
 
 		
 	def loadFromData(self,state,data):
@@ -514,9 +557,9 @@ class ImagePipelineViewer(ImageViewer):
 				self.pixmaps[state] = QtGui.QPixmap()
 			pm = self.pixmaps[state]
 			pm.loadFromData(data)
-			
-		self.selectState(self.TabBar.tabText(self.TabBar.currentIndex()))
-			
+		
+		if state == self.currentState:
+			self.selectState(self.currentState)
 
 	
 

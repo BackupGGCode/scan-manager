@@ -248,6 +248,7 @@ class GeneralTab(CameraControlsTab):
 					if 'crop' not in self.aq.camera.settings:
 						self.aq.camera.settings.crop = BaseSettings()
 					self._up.Layout.addRow(self)
+
 	
 				class Layout(BaseLayout,QtGui.QFormLayout):
 					def init(self):
@@ -257,10 +258,12 @@ class GeneralTab(CameraControlsTab):
 	
 				class CropCheckbox(BaseWidget,QtGui.QCheckBox): 
 					def init(self):
+						self.blockSignals(True)
 						self._up.Layout.addRow(self)
 						self.setText(self.tr('Crop images'))
 						if 'crop' in self.aq.camera.settings:
 							self.setChecked(self.aq.camera.settings.crop.get('enabled',False))
+						self.blockSignals(False)
 						
 					def onstateChanged(self):
 						if self.isChecked():
@@ -273,17 +276,96 @@ class GeneralTab(CameraControlsTab):
 				class CropSpinners(BaseWidget,QtGui.QWidget):
 					def init(self):
 						self._up.Layout.addRow(self)
-						if 'crop' not in self.aq.camera.settings or not self.aq.camera.settings.crop.get('coords',None):
+						
+						if 'crop' in self.aq.camera.settings and self.aq.camera.settings.crop.get('coords',None):
+							self.load()
+
+						ndx = self.aq.getCameraIndex()
+						preview = self.app.previews[ndx]
+						preview.cropBoxChanged.connect(self.cropBoxChanged)
+						preview.pixmapChanged.connect(self.pixmapChanged)
+	
+					def cropBoxChanged(self,rect):
+						coords = self.rectToCoords(rect)
+						if coords:
+							self.aq.camera.settings.crop.coords = coords
+							self.load()
+						
+					
+					def pixmapChanged(self,rect):
+						ndx = self.aq.getCameraIndex()
+						preview = self.app.previews[ndx]
+						if not preview.cropBox.isVisible():
 							return
+						else:
+							self.update()
+						
+					
+					def load(self):
+						self.blockSignals(True)
+						for i in self.Left,self.Top,self.Right,self.Bottom:
+							i.blockSignals(True)
+							
 						c = self.aq.camera.settings.crop.coords
 						self.Left.setValue(c[0])
 						self.Top.setValue(c[1])
 						self.Right.setValue(c[2])
 						self.Bottom.setValue(c[3])
 						
+						self.blockSignals(False)
+						for i in self.Left,self.Top,self.Right,self.Bottom:
+							i.blockSignals(False)
+						
 					def update(self):
 						self.aq.camera.settings.crop.coords = (self.Left.value(),self.Top.value(),self.Right.value(),self.Bottom.value())
-					
+						ndx = self.aq.getCameraIndex()
+						preview = self.app.previews[ndx]
+						
+						rect = self.coordsToRect(self.aq.camera.settings.crop.coords)
+						
+						if rect is not None:
+							preview.cropBox.setRect(rect)
+						
+					def coordsToRect(self,c=None):
+						if c is None: 
+							c = self.aq.camera.settings.crop.coords
+						
+						ndx = self.aq.getCameraIndex()
+						preview = self.app.previews[ndx]
+						
+						pm = preview.pixmaps.get('undistorted',None)
+						if pm is None or pm.isNull():
+							return None
+						
+						size = pm.size()
+
+						return QtCore.QRect(
+							min(size.height(),c[0]),
+							min(size.width(),c[1]),
+							max(0,size.width()-(c[0]+c[2])),
+							max(0,size.height()-(c[1]+c[3]))
+						)
+						
+					def rectToCoords(self,rect):
+
+						ndx = self.aq.getCameraIndex()
+						preview = self.app.previews[ndx]
+						
+						pm = preview.pixmaps.get('undistorted',None)
+						if pm is None or pm.isNull():
+							return None
+						
+						size = pm.size()
+
+						c = (
+							rect.left(),
+							rect.top(),
+							size.width()-(rect.left()+rect.width()),
+							size.height()-(rect.top()+rect.height())
+						)
+
+						return c
+						
 					class Layout(BaseLayout,QtGui.QGridLayout):
 						def init(self):
 							self.setContentsMargins(0,0,0,0)
@@ -291,10 +373,12 @@ class GeneralTab(CameraControlsTab):
 						
 					class Top(BaseWidget,QtGui.QSpinBox):
 						def init(self):
+							self.blockSignals(True)
 							self.setAccelerated(True)
 							self.setMinimum(0)
 							self.setMaximum(99999)
 							self.localInit()
+							self.blockSignals(False)
 						def onvalueChanged(self):
 							self._up.update()
 						def localInit(self):

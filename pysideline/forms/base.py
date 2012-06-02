@@ -6,15 +6,7 @@ import types
 import collections
 import inspect
 
-class __NOTSET(object):
-	def __nonzero__(self):
-		return False
-	def __eq__(self,other):
-		if isinstance(other,self.__class__):
-			return True
-		else:
-			return False
-NOTSET = __NOTSET()
+from ..core import NOTSET
 
 class __NOTSTORED(object):
 	def __nonzero__(self):
@@ -125,10 +117,6 @@ class _Properties(object):
 		
 		for propertyFactory in expandedArgs:
 			property = propertyFactory(field,self)
-			
-			# Commented out to allow overriding of properties
-			#if property.name in self.contents:
-			#	raise Exception('Property %s already exists in %s'%(property.name,self.field.__class__.__name__))
 			
 			self.contents[property.name] = property
 			

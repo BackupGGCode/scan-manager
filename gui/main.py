@@ -162,7 +162,6 @@ class App(Application):
 		
 
 	calibrationDataChanged = QtCore.Signal()
-	cropboxChanged = QtCore.Signal(object,object)
 
 
 

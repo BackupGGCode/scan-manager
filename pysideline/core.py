@@ -11,8 +11,18 @@ from PySide import QtGui
 import itertools
 import sys
 
-__all__ = ['signalsCache','BaseInstantiable','BaseWidget','BaseLayout','BaseDialog','BaseRootInstantiable','Application']
+__all__ = ['NOTSET','signalsCache','BaseInstantiable','BaseWidget','BaseLayout','BaseDialog','BaseRootInstantiable','Application']
 
+
+class __NOTSET(object):
+	def __nonzero__(self):
+		return False
+	def __eq__(self,other):
+		if isinstance(other,self.__class__):
+			return True
+		else:
+			return False
+NOTSET = __NOTSET()
 
 signalsCache = {} #: a local cache of class->(dict of signal id->QtCore.Signal)
 classDefinitionOrderCounter = itertools.count() #: a (thread-safe) counter used to number classes so we can sort them in order of class definition later

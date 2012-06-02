@@ -1,6 +1,7 @@
 import threading
 import Queue
 from PySide import QtGui
+from PySide import QtCore
 import log
 import itertools
 import Queue
@@ -37,29 +38,42 @@ class PostCaptureJob(ProcessingJob):
 		
 		camera = self.app.cameras[self.cameraIndex-1]
 		
-		if not (camera.settings.get('undistort',None) and camera.settings.undistort.isActive()) and not (camera.settings.crop.get('enabled',False)):
-			# neither correction nor cropping configured so do not save a processed version
-			return
-
 		if not self.pm:
 			self.pm = QtGui.QPixmap()
 			self.pm.load(self.image[self.cameraIndex].raw.getFilePath())
+
+		self.pmUndistorted = self.pm
+
+		if not (camera.settings.get('undistort',None) and camera.settings.undistort.isActive()) and not (camera.settings.crop.get('enabled',False)):
+			# neither correction nor cropping configured so do not save a processed version
+			return
 		
 		# calibration correction
 		if camera.settings.get('undistort',None) and camera.settings.undistort.isActive():
 			self.pm = camera.settings.undistort.correct(self.pm)
+			self.pmUndistorted = self.pm
 
 		# cropping
-		if camera.settings.crop.get('enabled',False):
-			qi = self.pm.toImage()
+		if camera.settings.crop.get('enabled',False) and camera.settings.crop.coords:
 			c = camera.settings.crop.coords
+			
+			qi = self.pm.toImage()
 			size = qi.size()
-			qi = qi.copy(c[0],c[1],max(size.width()-c[2],c[0]+1),max(size.height()-c[3],c[1]+1))
+
+			rect = QtCore.QRect(
+				min(size.height(),c[0]),
+				min(size.width(),c[1]),
+				max(0,size.width()-(c[0]+c[2])),
+				max(0,size.height()-(c[1]+c[3]))
+			)
+
+			qi = qi.copy(rect)
 			self.pm = QtGui.QPixmap.fromImage(qi)
 		
 		self.pm.save(self.image[self.cameraIndex].processed.getFilePath())
 
 	def oncompletion(self):
+		self.app.previews[self.cameraIndex].loadFromData('undistorted',self.pmUndistorted)
 		self.app.previews[self.cameraIndex].loadFromData('processed',self.pm)
 
 
@@ -87,8 +101,10 @@ class ImageLoadJob(ProcessingJob):
 		for cameraIndex in self.app.cameraIndices:
 			self.app.previews[cameraIndex].loadFromData('raw',self.pms[cameraIndex]['raw'])
 			if self.pms[cameraIndex]['processed']:
+				self.app.previews[cameraIndex].loadFromData('undistorted',QtGui.QPixmap())
 				self.app.previews[cameraIndex].loadFromData('processed',self.pms[cameraIndex]['processed'])
 			else:
+				self.app.previews[cameraIndex].loadFromData('undistorted',QtGui.QPixmap())
 				self.app.previews[cameraIndex].loadFromData('processed',self.pms[cameraIndex]['raw'])
 				
 

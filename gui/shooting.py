@@ -97,13 +97,12 @@ class LiveView(BaseWidget,QtGui.QLabel):
 	
 
 class Preview(imageviewer.ImagePipelineViewer):
-	tabNames = ['raw','processed'] 
-
-	def showCropBox(self):
-		self.cropBox.show()
-
-	def hideCropBox(self):
-		self.cropBox.hide()
+	tabNames = ['raw','undistorted','processed']
+	
+	def init(self):
+		super(Preview,self).init()
+		self.selectState('raw')
+		self.setCropboxForState('undistorted',True)
 
 	
 
